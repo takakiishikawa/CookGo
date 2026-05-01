@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Camera,
-  Check,
   ExternalLink,
   Pencil,
   RefreshCw,
@@ -19,16 +18,11 @@ import { AppHeader } from "@/components/layout/app-header";
 import {
   Badge,
   Button,
-  Card,
-  CardContent,
-  PageHeader,
-  Progress,
+  Separator,
   Skeleton,
-  Stepper,
   toast,
 } from "@takaki/go-design-system";
 import { Recipe, RecipeStep } from "@/types/database";
-import { cn } from "@/lib/utils";
 import { useFoodImage } from "@/hooks/use-food-image";
 import { createClient } from "@/lib/supabase/client";
 import { DB_SCHEMA } from "@/lib/constants";
@@ -69,14 +63,10 @@ function StepImage({
       )}
       <button
         type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onRegenerate();
-        }}
+        onClick={onRegenerate}
         disabled={regenerating}
         className="absolute top-2 right-2 inline-flex items-center justify-center w-8 h-8 rounded-full bg-black/55 backdrop-blur text-white hover:bg-black/75 transition-colors disabled:opacity-50"
-        aria-label="この画像を更新"
+        aria-label="この画像を変える"
         title="画像を別の候補に変える"
       >
         {regenerating ? (
@@ -94,7 +84,6 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
   const supabase = createClient();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [imageUrl, setImageUrl] = useState<string | null>(recipe.image_url);
   const [uploading, setUploading] = useState(false);
   const [stepsState, setStepsState] = useState<RecipeStep[]>(() =>
@@ -108,39 +97,6 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
     () => groupStepsIntoPhases(stepsState),
     [stepsState],
   );
-  const hasPhases = stepPhases.length > 1 && stepPhases[0].name !== "";
-
-  // 各フェーズ範囲(absolute index 範囲)
-  const phaseRanges = useMemo(() => {
-    const ranges: Array<{ start: number; end: number; size: number }> = [];
-    let cursor = 0;
-    stepPhases.forEach((p) => {
-      ranges.push({
-        start: cursor,
-        end: cursor + p.steps.length - 1,
-        size: p.steps.length,
-      });
-      cursor += p.steps.length;
-    });
-    return ranges;
-  }, [stepPhases]);
-
-  // 現在のフェーズ index = "全ステップ完了済の連続するフェーズ" の次
-  const currentPhaseIndex = useMemo(() => {
-    if (!hasPhases) return 0;
-    for (let i = 0; i < phaseRanges.length; i++) {
-      const range = phaseRanges[i];
-      const phaseSteps = stepsState.slice(range.start, range.end + 1);
-      const allDone = phaseSteps.every((s) => completedSteps.has(s.order));
-      if (!allDone) return i;
-    }
-    return phaseRanges.length - 1;
-  }, [phaseRanges, stepsState, completedSteps, hasPhases]);
-
-  const overallProgress =
-    stepsState.length > 0
-      ? Math.round((completedSteps.size / stepsState.length) * 100)
-      : 0;
 
   const youtubeSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(recipe.title + " 作り方")}`;
 
@@ -199,15 +155,6 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
     }
   };
 
-  const toggleStep = (order: number) => {
-    setCompletedSteps((prev) => {
-      const next = new Set(prev);
-      if (next.has(order)) next.delete(order);
-      else next.add(order);
-      return next;
-    });
-  };
-
   const handleFilePicked = async (file: File) => {
     if (!file.type.startsWith("image/")) {
       toast.error("画像ファイルを選択してください");
@@ -245,7 +192,7 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
       if (error) throw error;
 
       setImageUrl(publicUrl);
-      toast.success("写真を更新しました");
+      toast.success("写真を変更しました");
       router.refresh();
     } catch (err) {
       toast.error(
@@ -266,90 +213,70 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
         ]}
       />
 
-      {/* Hero image */}
-      <div className="relative overflow-hidden">
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={recipe.title}
-            className="w-full h-56 md:h-72 object-cover"
-            fetchPriority="high"
-            loading="eager"
-          />
-        ) : (
-          <div className="w-full h-56 md:h-72 bg-surface-subtle flex items-center justify-center">
-            <UtensilsCrossed
-              className="w-12 h-12 text-muted-foreground"
-              strokeWidth={1.5}
+      <div className="px-4 md:px-8 pt-6 pb-12 space-y-6 max-w-3xl">
+        {/* ===== コンパクトヘッダー (画像 左 + タイトル/説明 右) ===== */}
+        <div className="flex gap-4 items-start">
+          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-lg overflow-hidden flex-shrink-0 bg-muted">
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={recipe.title}
+                className="w-full h-full object-cover"
+                loading="eager"
+                fetchPriority="high"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <UtensilsCrossed
+                  className="w-8 h-8 text-muted-foreground/40"
+                  strokeWidth={1.5}
+                />
+              </div>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleFilePicked(f);
+              }}
             />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="absolute bottom-1 right-1 inline-flex items-center justify-center w-7 h-7 rounded-full bg-black/60 backdrop-blur text-white hover:bg-black/80 transition-colors disabled:opacity-50"
+              aria-label="写真を変更"
+              title="写真を変更"
+            >
+              {uploading ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Camera className="w-3.5 h-3.5" />
+              )}
+            </button>
           </div>
-        )}
-        <div className="absolute bottom-2 right-2">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) handleFilePicked(f);
-            }}
-          />
-          <Button
-            size="sm"
-            variant="secondary"
-            className="gap-1.5 bg-black/60 text-white hover:bg-black/80 backdrop-blur"
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-          >
-            <Camera className="w-3.5 h-3.5" />
-            {uploading ? "アップロード中..." : "写真を変更"}
-          </Button>
+          <div className="flex-1 min-w-0 space-y-1.5">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-snug">
+              {recipe.title}
+            </h1>
+            {recipe.description && (
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {recipe.description}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
 
-      <div className="px-4 md:px-8 pt-5 pb-12 space-y-6 max-w-4xl">
-        {/* タイトル + アクション */}
-        <PageHeader
-          title={recipe.title}
-          description={recipe.description ?? undefined}
-          actions={
-            <div className="flex items-center gap-1">
-              <Button
-                size="icon"
-                variant="ghost"
-                asChild
-                aria-label="編集"
-                title="編集"
-              >
-                <Link href={`/recipes/${recipe.id}/edit`}>
-                  <Pencil className="w-4 h-4" />
-                </Link>
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={deleteRecipe}
-                aria-label="削除"
-                title="削除"
-              >
-                <Trash2 className="w-4 h-4 text-destructive" />
-              </Button>
-              <Button
-                size="sm"
-                onClick={openShoppingList}
-                className="gap-1.5 ml-1"
-              >
-                <ShoppingCart className="w-4 h-4" />
-                買い物リスト
-              </Button>
-            </div>
-          }
-        />
-
-        {/* 元レシピ: コンパクトな chip */}
-        {recipe.source_url && (
-          <div className="flex flex-wrap gap-2">
+        {/* ===== アクション行 ===== */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={openShoppingList} className="gap-1.5" size="sm">
+            <ShoppingCart className="w-4 h-4" />
+            買い物リスト
+          </Button>
+          {recipe.source_url && (
             <Button variant="outline" size="sm" asChild className="gap-1.5">
               <a
                 href={recipe.source_url}
@@ -365,126 +292,80 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
                 )}
               </a>
             </Button>
-            <Button variant="outline" size="sm" asChild className="gap-1.5">
-              <a
-                href={youtubeSearchUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Video className="w-3.5 h-3.5 text-destructive" />
-                YouTube で参考動画
-              </a>
+          )}
+          <Button variant="outline" size="sm" asChild className="gap-1.5">
+            <a
+              href={youtubeSearchUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Video className="w-3.5 h-3.5 text-destructive" />
+              YouTube
+            </a>
+          </Button>
+          <div className="ml-auto flex gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              asChild
+              aria-label="編集"
+              title="編集"
+            >
+              <Link href={`/recipes/${recipe.id}/edit`}>
+                <Pencil className="w-4 h-4" />
+              </Link>
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={deleteRecipe}
+              aria-label="削除"
+              title="削除"
+            >
+              <Trash2 className="w-4 h-4 text-destructive" />
             </Button>
           </div>
-        )}
+        </div>
 
-        {/* 作り方 (メイン) */}
+        <Separator />
+
+        {/* ===== 作り方 (シンプルな縦リスト, 完了状態なし) ===== */}
         {stepsState.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-end justify-between gap-3 flex-wrap">
-              <div>
-                <h2 className="text-lg md:text-xl font-bold">作り方</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {completedSteps.size} / {stepsState.length} ステップ完了
-                </p>
-              </div>
-              {!recipe.source_url && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  asChild
-                  className="gap-1.5"
-                >
-                  <a
-                    href={youtubeSearchUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Video className="w-3.5 h-3.5 text-destructive" />
-                    YouTube
-                  </a>
-                </Button>
-              )}
+          <div className="space-y-8">
+            <div>
+              <h2 className="text-lg md:text-xl font-bold">作り方</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {stepsState.length}ステップ
+              </p>
             </div>
 
-            {/* 全体進捗バー */}
-            <Progress value={overallProgress} />
-
-            {/* フェーズ Stepper (6+ ステップのみ) */}
-            {hasPhases && (
-              <div className="rounded-lg border bg-card px-4 py-3">
-                <Stepper
-                  steps={stepPhases.map((p, i) => ({
-                    title: p.name,
-                    description: `${p.steps.length}ステップ`,
-                    status:
-                      i < currentPhaseIndex
-                        ? ("completed" as const)
-                        : i === currentPhaseIndex
-                          ? ("current" as const)
-                          : ("upcoming" as const),
-                  }))}
-                  currentStep={currentPhaseIndex}
-                  orientation="horizontal"
-                />
-              </div>
-            )}
-
-            {/* ステップカード */}
-            <div className="space-y-6">
-              {stepPhases.map((phase, phaseIndex) => (
-                <div key={phaseIndex} className="space-y-3">
-                  {phase.name && (
-                    <div className="flex items-center gap-2 px-1">
-                      <Badge
-                        variant={
-                          phaseIndex === currentPhaseIndex
-                            ? "default"
-                            : "outline"
-                        }
-                      >
-                        Phase {phaseIndex + 1}/{stepPhases.length}
-                      </Badge>
+            {stepPhases.map((phase, phaseIndex) => (
+              <section key={phaseIndex} className="space-y-4">
+                {phase.name && (
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-muted-foreground tabular-nums">
+                        {phaseIndex + 1} / {stepPhases.length}
+                      </span>
                       <h3 className="text-base font-semibold">{phase.name}</h3>
                     </div>
-                  )}
-                  <div className="space-y-3">
-                    {phase.steps.map((step) => {
-                      const done = completedSteps.has(step.order);
-                      const absIndex = stepsState.findIndex(
-                        (s) => s.order === step.order,
-                      );
-                      return (
-                        <button
-                          key={step.order}
-                          onClick={() => toggleStep(step.order)}
-                          className={cn(
-                            "w-full text-left flex flex-col gap-3 p-4 rounded-lg border transition-colors",
-                            done
-                              ? "bg-primary/5 border-primary/30"
-                              : "bg-card border-border hover:bg-muted",
-                          )}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div
-                              className={cn(
-                                "w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-semibold",
-                                done
-                                  ? "bg-primary text-primary-foreground"
-                                  : "bg-primary/10 text-primary",
-                              )}
-                            >
-                              {done ? <Check className="w-4 h-4" /> : step.order}
-                            </div>
-                            <p
-                              className={cn(
-                                "text-base leading-relaxed flex-1 text-left pt-1.5",
-                                done && "line-through text-muted-foreground",
-                              )}
-                            >
-                              {step.text}
-                            </p>
-                          </div>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+                )}
+                <ol className="space-y-5">
+                  {phase.steps.map((step) => {
+                    const absIndex = stepsState.findIndex(
+                      (s) => s.order === step.order,
+                    );
+                    return (
+                      <li key={step.order} className="flex gap-3">
+                        <span className="flex-shrink-0 w-7 h-7 rounded-full bg-primary/10 text-primary text-sm font-bold flex items-center justify-center mt-0.5 tabular-nums">
+                          {step.order}
+                        </span>
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <p className="text-base leading-relaxed">
+                            {step.text}
+                          </p>
                           {step.image_query && (
                             <StepImage
                               query={step.image_query}
@@ -494,26 +375,13 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
                               regenerating={regeneratingStep === absIndex}
                             />
                           )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* 完了 mini-CTA */}
-            {completedSteps.size === stepsState.length &&
-              stepsState.length > 0 && (
-                <Card className="bg-primary/5 border-primary/30">
-                  <CardContent className="p-4 text-center space-y-2">
-                    <p className="text-base font-semibold">完成です 🎉</p>
-                    <p className="text-xs text-muted-foreground">
-                      お疲れ様でした。次のレシピも探してみましょう。
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </section>
+            ))}
           </div>
         )}
       </div>
