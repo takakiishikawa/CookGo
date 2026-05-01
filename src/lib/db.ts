@@ -4,7 +4,6 @@ import type {
   Recipe,
   PantryItem,
   ShoppingListItem,
-  UserSettings,
   MealPlan,
   MealPlanWithRecipe,
   FoodLog,
@@ -17,28 +16,6 @@ function s(supabase: SupabaseClient) {
 }
 
 export const db = {
-  settings: {
-    get: async (
-      supabase: SupabaseClient,
-      userId: string,
-    ): Promise<UserSettings | null> => {
-      const { data } = await s(supabase)
-        .from("user_settings")
-        .select("*")
-        .eq("user_id", userId)
-        .single();
-      return data as UserSettings | null;
-    },
-    upsert: async (
-      supabase: SupabaseClient,
-      values: Partial<UserSettings> & { user_id: string },
-    ) => {
-      return s(supabase)
-        .from("user_settings")
-        .upsert(values, { onConflict: "user_id" });
-    },
-  },
-
   plans: {
     getWeek: async (
       supabase: SupabaseClient,
@@ -48,9 +25,7 @@ export const db = {
     ): Promise<MealPlanWithRecipe[]> => {
       const { data } = await s(supabase)
         .from("meal_plans")
-        .select(
-          "*, recipe:recipes(id, title, title_en, image_url, protein_g_per_serving, calorie_kcal_per_serving)",
-        )
+        .select("*, recipe:recipes(id, title, title_en, image_url)")
         .eq("user_id", userId)
         .gte("planned_date", startDate)
         .lte("planned_date", endDate)
@@ -66,43 +41,11 @@ export const db = {
     ): Promise<MealPlanWithRecipe[]> => {
       const { data } = await s(supabase)
         .from("meal_plans")
-        .select(
-          "*, recipe:recipes(id, title, title_en, image_url, protein_g_per_serving, calorie_kcal_per_serving)",
-        )
+        .select("*, recipe:recipes(id, title, title_en, image_url)")
         .eq("user_id", userId)
         .eq("planned_date", date)
         .order("meal_type");
       return (data ?? []) as unknown as MealPlanWithRecipe[];
-    },
-
-    getWeeklyProtein: async (
-      supabase: SupabaseClient,
-      userId: string,
-      startDate: string,
-      endDate: string,
-    ): Promise<Array<{ planned_date: string; protein_g: number }>> => {
-      const { data } = await s(supabase)
-        .from("meal_plans")
-        .select("planned_date, servings, recipe:recipes(protein_g_per_serving)")
-        .eq("user_id", userId)
-        .gte("planned_date", startDate)
-        .lte("planned_date", endDate);
-
-      if (!data) return [];
-
-      const byDate: Record<string, number> = {};
-      for (const row of data as unknown as Array<{
-        planned_date: string;
-        servings: number;
-        recipe: { protein_g_per_serving: number | null };
-      }>) {
-        const p = (row.recipe?.protein_g_per_serving ?? 0) * row.servings;
-        byDate[row.planned_date] = (byDate[row.planned_date] ?? 0) + p;
-      }
-      return Object.entries(byDate).map(([planned_date, protein_g]) => ({
-        planned_date,
-        protein_g: Math.round(protein_g),
-      }));
     },
 
     upsert: async (
@@ -278,7 +221,7 @@ export const db = {
       const { data } = await s(supabase)
         .from("food_logs")
         .select(
-          "*, recipe:recipes(id, title, title_en, image_url, protein_g_per_serving, calorie_kcal_per_serving, servings)",
+          "*, recipe:recipes(id, title, title_en, image_url, servings)",
         )
         .eq("user_id", userId)
         .eq("logged_date", date)
@@ -295,7 +238,7 @@ export const db = {
       const { data } = await s(supabase)
         .from("food_logs")
         .select(
-          "*, recipe:recipes(id, title, title_en, image_url, protein_g_per_serving, calorie_kcal_per_serving, servings)",
+          "*, recipe:recipes(id, title, title_en, image_url, servings)",
         )
         .eq("user_id", userId)
         .gte("logged_date", startDate)
@@ -314,7 +257,7 @@ export const db = {
       const { data } = await s(supabase)
         .from("food_logs")
         .select(
-          "*, recipe:recipes(id, title, title_en, image_url, protein_g_per_serving, calorie_kcal_per_serving, servings)",
+          "*, recipe:recipes(id, title, title_en, image_url, servings)",
         )
         .eq("user_id", userId)
         .eq("meal_type", mealType)

@@ -9,8 +9,6 @@ export const SCHEMA_SAMPLE = `{
   "title": "豚の生姜焼き",
   "title_en": "Ginger Pork",
   "description": "1〜2文の説明",
-  "protein_g_per_serving": 31,
-  "calorie_kcal_per_serving": 480,
   "prep_time_min": 20,
   "servings": 1,
   "ingredients": [
@@ -18,16 +16,12 @@ export const SCHEMA_SAMPLE = `{
       "name": "豚ロース",
       "amount": "150",
       "unit": "g",
-      "protein_g": 31,
-      "kcal_kcal": 405,
       "category": "protein"
     },
     {
       "name": "醤油",
       "amount": "大さじ2",
       "unit": "",
-      "protein_g": 0,
-      "kcal_kcal": 15,
       "category": "seasoning"
     }
   ],
@@ -39,11 +33,9 @@ export const SCHEMA_SAMPLE = `{
 
 export const FIXED_CONSTRAINTS = `【固定条件（最優先・必ず守る）】
 - 1食分（servings = 1）として出力
-- 高タンパク（1食あたり30g以上、可能なら40g以上）
 - ホーチミン市内のスーパーで手に入る食材を使用
 - 調理時間は60分以内
 - 食材は具体的に種目まで（例：「肉」ではなく「豚バラ肉」「鶏もも肉」など）
-- ingredients[*].protein_g / ingredients[*].kcal_kcal は その amount に対する絶対値（例: 豚ロース150g なら protein_g=31, kcal_kcal=405）。後で量を変更したとき比率で再計算するため、必ず妥当な値を入れる
 - ingredients[*].unit は数値量のときは "g" / "ml" など。"大さじ2" のように amount に単位が含まれる場合は空文字 ""
 - name_en / name_vi はサーバー側で後から自動付与するため出力不要（出力しても無視される）
 - steps[*].image_query は 各調理過程の写真検索用に英語で具体的に書く（必須・各ステップ毎に）`;
@@ -52,8 +44,6 @@ export interface RawDraft {
   title?: unknown;
   title_en?: unknown;
   description?: unknown;
-  protein_g_per_serving?: unknown;
-  calorie_kcal_per_serving?: unknown;
   prep_time_min?: unknown;
   is_meal_prep_friendly?: unknown;
   meal_prep_days?: unknown;
@@ -83,8 +73,6 @@ function normalizeIngredient(raw: unknown): RecipeIngredient | null {
         ? String(r.amount)
         : (asString(r.amount) ?? ""),
     unit: asString(r.unit) ?? "",
-    protein_g: asNumber(r.protein_g),
-    kcal_kcal: asNumber(r.kcal_kcal),
     in_pantry: r.in_pantry === true,
     category: asString(r.category),
   };
@@ -117,8 +105,6 @@ export function normalizeDraft(raw: RawDraft): DraftRecipe | null {
     title,
     title_en: asString(raw.title_en),
     description: asString(raw.description),
-    protein_g_per_serving: asNumber(raw.protein_g_per_serving),
-    calorie_kcal_per_serving: asNumber(raw.calorie_kcal_per_serving),
     prep_time_min: asNumber(raw.prep_time_min),
     is_meal_prep_friendly: raw.is_meal_prep_friendly === true,
     meal_prep_days: asNumber(raw.meal_prep_days),

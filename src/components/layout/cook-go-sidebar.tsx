@@ -16,6 +16,8 @@ import {
   Sun,
   Moon,
   FileText,
+  Dumbbell,
+  Scale,
 } from "lucide-react";
 import {
   Sidebar,
@@ -44,11 +46,6 @@ const GO_APPS = [
     color: "#0052CC",
   },
   {
-    name: "CareGo",
-    url: "https://care-go-mu.vercel.app/dashboard",
-    color: "#30A46C",
-  },
-  {
     name: "KenyakuGo",
     url: "https://kenyaku-go.vercel.app/",
     color: "#F5A623",
@@ -59,11 +56,6 @@ const GO_APPS = [
     url: "https://cook-go-lovat.vercel.app/dashboard",
     color: "#16A34A",
   },
-  {
-    name: "PhysicalGo",
-    url: "https://physical-go.vercel.app/dashboard",
-    color: "#FF6B6B",
-  },
 ] as const;
 
 const navItems = [
@@ -72,6 +64,8 @@ const navItems = [
   { href: "/recipes", icon: BookOpen, label: "レシピ" },
   { href: "/shopping", icon: ShoppingCart, label: "買い物リスト" },
   { href: "/pantry", icon: Archive, label: "食材庫" },
+  { href: "/training", icon: Dumbbell, label: "トレーニング" },
+  { href: "/body", icon: Scale, label: "ボディ" },
 ];
 
 function isActive(href: string, pathname: string) {

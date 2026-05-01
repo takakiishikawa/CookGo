@@ -14,58 +14,25 @@ export default async function DashboardPage() {
 
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
-  const fourteenDaysAgo = new Date(today);
-  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 13);
-  const fourteenDaysAgoStr = fourteenDaysAgo.toISOString().split("T")[0];
 
-  const fetchPlansByDate = async (date: string) => {
-    const { data } = await supabase
-      .schema(DB_SCHEMA)
-      .from("meal_plans")
-      .select(
-        "*, recipe:recipes(id, title, title_en, image_url, protein_g_per_serving, calorie_kcal_per_serving, servings)",
-      )
-      .eq("user_id", user.id)
-      .eq("planned_date", date);
-    return (data ?? []) as unknown as MealPlanWithRecipe[];
-  };
-  const fetchPlansRange = async (start: string, end: string) => {
-    const { data } = await supabase
-      .schema(DB_SCHEMA)
-      .from("meal_plans")
-      .select(
-        "*, recipe:recipes(id, title, title_en, image_url, protein_g_per_serving, calorie_kcal_per_serving, servings)",
-      )
-      .eq("user_id", user.id)
-      .gte("planned_date", start)
-      .lte("planned_date", end);
-    return (data ?? []) as unknown as MealPlanWithRecipe[];
-  };
+  const { data: todayPlansData } = await supabase
+    .schema(DB_SCHEMA)
+    .from("meal_plans")
+    .select("*, recipe:recipes(id, title, title_en, image_url)")
+    .eq("user_id", user.id)
+    .eq("planned_date", todayStr);
+  const todayPlans = (todayPlansData ?? []) as unknown as MealPlanWithRecipe[];
 
-  const [settings, todayLogs, twoWeekLogs, todayPlans, twoWeekPlans, recipes] =
-    await Promise.all([
-      db.settings.get(supabase, user.id),
-      db.foodLogs.getByDate(supabase, user.id, todayStr),
-      db.foodLogs.getByDateRange(
-        supabase,
-        user.id,
-        fourteenDaysAgoStr,
-        todayStr,
-      ),
-      fetchPlansByDate(todayStr),
-      fetchPlansRange(fourteenDaysAgoStr, todayStr),
-      db.recipes.getAll(supabase, user.id, 200),
-    ]);
+  const [todayLogs, recipes] = await Promise.all([
+    db.foodLogs.getByDate(supabase, user.id, todayStr),
+    db.recipes.getAll(supabase, user.id, 200),
+  ]);
 
   return (
     <DashboardClient
-      proteinTarget={settings?.protein_target_g ?? 108}
-      calorieTarget={settings?.calorie_target_kcal ?? 2000}
       initialDate={todayStr}
       initialDateLogs={todayLogs}
       initialDatePlans={todayPlans}
-      twoWeekLogs={twoWeekLogs}
-      twoWeekPlans={twoWeekPlans}
       recipes={recipes}
     />
   );

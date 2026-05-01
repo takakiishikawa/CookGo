@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     const { data: recipe } = await supabase
       .schema(DB_SCHEMA)
       .from("recipes")
-      .select("id, protein_g_per_serving")
+      .select("id")
       .eq("id", recipe_id)
       .eq("user_id", user.id)
       .single();
@@ -106,13 +106,8 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    const total_protein_g = Math.round(
-      (recipe.protein_g_per_serving ?? 0) * servings * dates.length,
-    );
-
     return NextResponse.json({
       plans_created: dates.length,
-      total_protein_g,
     } satisfies PlanMapResponse);
   } catch (error) {
     console.error("Plan map error:", error);

@@ -279,16 +279,13 @@ export function NewRecipeClient({
                           )}
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        {c.protein_g_per_serving && (
-                          <Badge>P {c.protein_g_per_serving}g</Badge>
-                        )}
-                        {c.calorie_kcal_per_serving && (
+                      {c.prep_time_min && (
+                        <div className="flex flex-wrap gap-1">
                           <Badge variant="secondary">
-                            {c.calorie_kcal_per_serving}kcal
+                            {c.prep_time_min}分
                           </Badge>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );

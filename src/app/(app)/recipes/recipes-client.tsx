@@ -80,16 +80,6 @@ function RecipeCard({
               {recipe.title}
             </p>
             <div className="flex flex-wrap gap-1">
-              {recipe.protein_g_per_serving != null &&
-                recipe.protein_g_per_serving > 0 && (
-                  <Badge>P {recipe.protein_g_per_serving}g</Badge>
-                )}
-              {recipe.calorie_kcal_per_serving != null &&
-                recipe.calorie_kcal_per_serving > 0 && (
-                  <Badge variant="secondary">
-                    {recipe.calorie_kcal_per_serving}kcal
-                  </Badge>
-                )}
               {recipe.is_tried && (
                 <Badge
                   variant="outline"

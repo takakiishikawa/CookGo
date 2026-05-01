@@ -7,12 +7,7 @@ import type {
   FoodLogCreateResponse,
   FoodLogsListResponse,
 } from "@/types/api";
-import type {
-  FoodLogIngredientOverride,
-  FoodLogOverrides,
-  RecipeIngredient,
-  MealType,
-} from "@/types/database";
+import type { MealType } from "@/types/database";
 
 const ALLOWED_MEAL_TYPES: ReadonlySet<MealType> = new Set([
   "breakfast",
@@ -23,82 +18,6 @@ const ALLOWED_MEAL_TYPES: ReadonlySet<MealType> = new Set([
 
 function isValidDate(s: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(s);
-}
-
-function toFloat(v: unknown): number | null {
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
-}
-
-function computeActualNutrition(
-  recipe: {
-    protein_g_per_serving: number | null;
-    calorie_kcal_per_serving: number | null;
-    servings: number;
-    ingredients: RecipeIngredient[] | null;
-  },
-  servings: number,
-  overrides: FoodLogOverrides | null,
-): { actual_protein_g: number | null; actual_calorie_kcal: number | null } {
-  let proteinPerServing = recipe.protein_g_per_serving;
-  let kcalPerServing = recipe.calorie_kcal_per_serving;
-  const ovIngs = overrides?.ingredients ?? [];
-
-  if (ovIngs.length > 0 && Array.isArray(recipe.ingredients)) {
-    const overrideMap = new Map<number, FoodLogIngredientOverride>();
-    for (const o of ovIngs) overrideMap.set(o.index, o);
-
-    // protein
-    const baseProteinTotal = recipe.ingredients.reduce(
-      (sum, ing) => sum + (toFloat(ing.protein_g) ?? 0),
-      0,
-    );
-    const overriddenProteinTotal = recipe.ingredients.reduce((sum, ing, i) => {
-      const o = overrideMap.get(i);
-      const protein =
-        o?.protein_g !== undefined && o.protein_g !== null
-          ? o.protein_g
-          : (toFloat(ing.protein_g) ?? 0);
-      return sum + protein;
-    }, 0);
-    if (baseProteinTotal > 0 && proteinPerServing != null) {
-      proteinPerServing =
-        (overriddenProteinTotal / baseProteinTotal) * proteinPerServing;
-    } else if (baseProteinTotal === 0 && overriddenProteinTotal > 0) {
-      proteinPerServing = overriddenProteinTotal;
-    }
-
-    // kcal: scale by amount ratio (only if base ingredient has both amount and kcal)
-    const baseKcalTotal = recipe.ingredients.reduce(
-      (sum, ing) => sum + (toFloat(ing.kcal_kcal) ?? 0),
-      0,
-    );
-    if (baseKcalTotal > 0) {
-      const overriddenKcalTotal = recipe.ingredients.reduce((sum, ing, i) => {
-        const o = overrideMap.get(i);
-        if (!o) return sum + (toFloat(ing.kcal_kcal) ?? 0);
-        const baseAmount = Number(ing.amount) || 0;
-        const overriddenAmount = Number(o.amount) || baseAmount;
-        const baseKcal = toFloat(ing.kcal_kcal) ?? 0;
-        const ratio = baseAmount > 0 ? overriddenAmount / baseAmount : 1;
-        return sum + baseKcal * ratio;
-      }, 0);
-      if (kcalPerServing != null) {
-        kcalPerServing = (overriddenKcalTotal / baseKcalTotal) * kcalPerServing;
-      } else {
-        kcalPerServing = overriddenKcalTotal;
-      }
-    }
-  }
-
-  const actual_protein_g =
-    proteinPerServing != null
-      ? Math.round(proteinPerServing * servings * 10) / 10
-      : null;
-  const actual_calorie_kcal =
-    kcalPerServing != null
-      ? Math.round(kcalPerServing * servings * 10) / 10
-      : null;
-  return { actual_protein_g, actual_calorie_kcal };
 }
 
 export async function POST(request: Request) {
@@ -130,9 +49,7 @@ export async function POST(request: Request) {
     const { data: recipe } = await supabase
       .schema(DB_SCHEMA)
       .from("recipes")
-      .select(
-        "id, protein_g_per_serving, calorie_kcal_per_serving, servings, ingredients",
-      )
+      .select("id")
       .eq("id", body.recipe_id)
       .eq("user_id", user.id)
       .single();
@@ -141,11 +58,6 @@ export async function POST(request: Request) {
 
     const servings = body.servings ?? 1;
     const overrides = body.overrides ?? null;
-    const nutrition = computeActualNutrition(
-      recipe as Parameters<typeof computeActualNutrition>[0],
-      servings,
-      overrides,
-    );
 
     const { data: inserted, error } = await supabase
       .schema(DB_SCHEMA)
@@ -157,12 +69,8 @@ export async function POST(request: Request) {
         meal_type: body.meal_type,
         servings,
         overrides,
-        actual_protein_g: nutrition.actual_protein_g,
-        actual_calorie_kcal: nutrition.actual_calorie_kcal,
       })
-      .select(
-        "*, recipe:recipes(id, title, title_en, image_url, protein_g_per_serving, calorie_kcal_per_serving, servings)",
-      )
+      .select("*, recipe:recipes(id, title, title_en, image_url, servings)")
       .single();
     if (error) throw error;
 

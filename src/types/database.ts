@@ -1,20 +1,9 @@
-export interface UserSettings {
-  id: string;
-  user_id: string;
-  protein_target_g: number;
-  calorie_target_kcal: number | null;
-  weight_kg: number | null;
-  created_at: string;
-}
-
 export interface RecipeIngredient {
   name: string;
   name_en: string | null;
   name_vi: string | null;
   amount: string;
   unit: string | null;
-  protein_g: number | null;
-  kcal_kcal: number | null;
   in_pantry: boolean;
   category: string | null;
 }
@@ -39,8 +28,6 @@ export interface Recipe {
   title: string;
   title_en: string | null;
   description: string | null;
-  protein_g_per_serving: number | null;
-  calorie_kcal_per_serving: number | null;
   servings: number;
   prep_time_min: number | null;
   is_meal_prep_friendly: boolean;
@@ -68,15 +55,7 @@ export interface MealPlan {
 }
 
 export interface MealPlanWithRecipe extends MealPlan {
-  recipe: Pick<
-    Recipe,
-    | "id"
-    | "title"
-    | "title_en"
-    | "image_url"
-    | "protein_g_per_serving"
-    | "calorie_kcal_per_serving"
-  >;
+  recipe: Pick<Recipe, "id" | "title" | "title_en" | "image_url">;
 }
 
 export interface PantryItem {
@@ -119,7 +98,6 @@ export interface FoodLogIngredientOverride {
   index: number;
   amount?: string;
   unit?: string | null;
-  protein_g?: number | null;
 }
 
 export interface FoodLogOverrides {
@@ -134,22 +112,11 @@ export interface FoodLog {
   meal_type: MealType;
   servings: number;
   overrides: FoodLogOverrides | null;
-  actual_protein_g: number | null;
-  actual_calorie_kcal: number | null;
   created_at: string;
 }
 
 export interface FoodLogWithRecipe extends FoodLog {
-  recipe: Pick<
-    Recipe,
-    | "id"
-    | "title"
-    | "title_en"
-    | "image_url"
-    | "protein_g_per_serving"
-    | "calorie_kcal_per_serving"
-    | "servings"
-  >;
+  recipe: Pick<Recipe, "id" | "title" | "title_en" | "image_url" | "servings">;
 }
 
 export const PANTRY_CATEGORIES = [
@@ -159,3 +126,51 @@ export const PANTRY_CATEGORIES = [
   "炭水化物",
   "その他",
 ] as const;
+
+// ---------------------------------------------------------------------------
+// Body management (PhysicalGo統合)
+// ---------------------------------------------------------------------------
+
+export interface Exercise {
+  id: string;
+  name: string; // 'bench_press' | 'half_deadlift' | 'pull_up'
+  name_ja: string;
+  created_at: string;
+}
+
+export const EXERCISE_NAMES = {
+  BENCH_PRESS: "bench_press",
+  HALF_DEADLIFT: "half_deadlift",
+  PULL_UP: "pull_up",
+} as const;
+
+export type ExerciseName = (typeof EXERCISE_NAMES)[keyof typeof EXERCISE_NAMES];
+
+export type RecordType = "weight_5rep" | "max_reps" | "volume";
+
+export interface PersonalRecord {
+  id: string;
+  user_id: string;
+  exercise_id: string;
+  recorded_at: string;
+  weight_kg: number | null;
+  reps: number | null;
+  record_type: RecordType;
+  is_pr: boolean;
+  note: string | null;
+  created_at: string;
+}
+
+export interface PersonalRecordWithExercise extends PersonalRecord {
+  exercises: Exercise;
+}
+
+export interface BodyRecord {
+  id: string;
+  user_id: string;
+  recorded_at: string;
+  weight_kg: number | null;
+  body_fat_pct: number | null;
+  note: string | null;
+  created_at: string;
+}

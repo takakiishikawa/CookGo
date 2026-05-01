@@ -9,26 +9,6 @@ import type {
 } from "@/types/api";
 import type { RecipeIngredient, RecipeSourceTag } from "@/types/database";
 
-function sumProtein(ingredients: RecipeIngredient[]): number {
-  return (
-    Math.round(
-      ingredients.reduce(
-        (s, i) => s + (typeof i.protein_g === "number" ? i.protein_g : 0),
-        0,
-      ) * 10,
-    ) / 10
-  );
-}
-
-function sumKcal(ingredients: RecipeIngredient[]): number {
-  return Math.round(
-    ingredients.reduce(
-      (s, i) => s + (typeof i.kcal_kcal === "number" ? i.kcal_kcal : 0),
-      0,
-    ),
-  );
-}
-
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -94,25 +74,16 @@ export async function POST(request: Request) {
             name_vi: ing.name_vi ?? t?.vi ?? null,
             amount: ing.amount ?? "",
             unit: ing.unit ?? "",
-            protein_g: typeof ing.protein_g === "number" ? ing.protein_g : null,
-            kcal_kcal: typeof ing.kcal_kcal === "number" ? ing.kcal_kcal : null,
             in_pantry: pantryNames.has((ing.name ?? "").toLowerCase()),
             category: ing.category ?? null,
           };
         },
-      );
-      const hasAnyKcalData = ingredients.some(
-        (i) => typeof i.kcal_kcal === "number",
       );
       return {
         user_id: user.id,
         title: draft.title,
         title_en: draft.title_en ?? null,
         description: draft.description ?? null,
-        protein_g_per_serving: sumProtein(ingredients),
-        calorie_kcal_per_serving: hasAnyKcalData
-          ? sumKcal(ingredients)
-          : draft.calorie_kcal_per_serving,
         prep_time_min: draft.prep_time_min,
         is_meal_prep_friendly: false,
         meal_prep_days: null,

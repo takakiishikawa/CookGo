@@ -7,7 +7,6 @@ import {
   Plus,
   Trash2,
   UtensilsCrossed,
-  CalendarDays,
   RefreshCw,
 } from "lucide-react";
 import {
@@ -15,7 +14,6 @@ import {
   PageHeader,
   Card,
   CardContent,
-  Badge,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -286,16 +284,6 @@ export function PlanClient({
                                   <p className="text-xs font-medium line-clamp-1 leading-tight">
                                     {plan.recipe.title}
                                   </p>
-                                  {plan.recipe.protein_g_per_serving && (
-                                    <p className="text-xs text-primary font-semibold mt-0.5">
-                                      P{" "}
-                                      {Math.round(
-                                        plan.recipe.protein_g_per_serving *
-                                          plan.servings,
-                                      )}
-                                      g
-                                    </p>
-                                  )}
                                 </CardContent>
                               </Card>
                               <button
@@ -328,33 +316,6 @@ export function PlanClient({
           </table>
         </div>
 
-        {/* Weekly protein summary */}
-        {plans.length > 0 && (
-          <div className="flex gap-2 flex-wrap">
-            {weekDays.map((date) => {
-              const dayPlans = MEAL_TYPES.flatMap(
-                (t) => plansByCell.get(`${date}:${t}`) ?? [],
-              );
-              const totalProtein = dayPlans.reduce(
-                (s, p) =>
-                  s + (p.recipe.protein_g_per_serving ?? 0) * p.servings,
-                0,
-              );
-              if (totalProtein === 0) return null;
-              return (
-                <div key={date} className="flex items-center gap-1">
-                  <CalendarDays className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">
-                    {formatDate(date).split("(")[1].replace(")", "")}:
-                  </span>
-                  <Badge variant="secondary" className="text-xs">
-                    {Math.round(totalProtein)}g
-                  </Badge>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {/* Recipe picker dialog */}
@@ -430,14 +391,6 @@ export function PlanClient({
                             <p className="text-sm font-medium truncate">
                               {r.title}
                             </p>
-                            {r.protein_g_per_serving != null && (
-                              <p className="text-xs text-primary">
-                                P{r.protein_g_per_serving}g
-                                {r.calorie_kcal_per_serving
-                                  ? ` ・ ${r.calorie_kcal_per_serving}kcal`
-                                  : ""}
-                              </p>
-                            )}
                           </div>
                         </button>
                       );

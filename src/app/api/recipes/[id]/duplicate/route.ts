@@ -30,8 +30,6 @@ export async function POST(
       title: `${src.title}（コピー）`,
       title_en: src.title_en,
       description: src.description,
-      protein_g_per_serving: src.protein_g_per_serving,
-      calorie_kcal_per_serving: src.calorie_kcal_per_serving,
       prep_time_min: src.prep_time_min,
       is_meal_prep_friendly: src.is_meal_prep_friendly ?? false,
       meal_prep_days: src.meal_prep_days,

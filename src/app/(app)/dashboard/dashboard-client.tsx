@@ -14,11 +14,9 @@ import {
   CardContent,
   Button,
   Badge,
-  Section,
   toast,
 } from "@takaki/go-design-system";
 import { AppHeader } from "@/components/layout/app-header";
-import { WeeklyChart } from "@/components/dashboard/weekly-chart";
 import { LogMealDialog } from "@/components/log-meal-dialog";
 import { RecipePickerDialog } from "@/components/recipe-picker-dialog";
 import {
@@ -31,13 +29,9 @@ import {
 } from "@/types/database";
 
 interface Props {
-  proteinTarget: number;
-  calorieTarget: number;
   initialDate: string;
   initialDateLogs: FoodLogWithRecipe[];
   initialDatePlans: MealPlanWithRecipe[];
-  twoWeekLogs: FoodLogWithRecipe[];
-  twoWeekPlans: MealPlanWithRecipe[];
   recipes: Recipe[];
 }
 
@@ -49,8 +43,6 @@ type Entry = {
   recipe_id: string;
   title: string;
   image_url: string | null;
-  protein_g: number;
-  kcal: number;
 };
 
 function todayStr(): string {
@@ -63,12 +55,6 @@ function addDays(dateStr: string, n: number): string {
   return d.toISOString().split("T")[0];
 }
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const dow = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
-  return `${d.getMonth() + 1}/${d.getDate()}(${dow})`;
-}
-
 function logToEntry(l: FoodLogWithRecipe): Entry {
   return {
     kind: "log",
@@ -78,14 +64,10 @@ function logToEntry(l: FoodLogWithRecipe): Entry {
     recipe_id: l.recipe_id,
     title: l.recipe.title,
     image_url: l.recipe.image_url,
-    protein_g: l.actual_protein_g ?? 0,
-    kcal: l.actual_calorie_kcal ?? 0,
   };
 }
 
 function planToEntry(p: MealPlanWithRecipe): Entry {
-  const proteinPer = p.recipe.protein_g_per_serving ?? 0;
-  const kcalPer = p.recipe.calorie_kcal_per_serving ?? 0;
   return {
     kind: "plan",
     id: p.id,
@@ -94,19 +76,13 @@ function planToEntry(p: MealPlanWithRecipe): Entry {
     recipe_id: p.recipe_id,
     title: p.recipe.title,
     image_url: p.recipe.image_url,
-    protein_g: proteinPer * p.servings,
-    kcal: kcalPer * p.servings,
   };
 }
 
 export function DashboardClient({
-  proteinTarget,
-  calorieTarget,
   initialDate,
   initialDateLogs,
   initialDatePlans,
-  twoWeekLogs,
-  twoWeekPlans,
   recipes,
 }: Props) {
   const [date, setDate] = useState(initialDate);
@@ -114,19 +90,15 @@ export function DashboardClient({
     useState<FoodLogWithRecipe[]>(initialDateLogs);
   const [datePlans, setDatePlans] =
     useState<MealPlanWithRecipe[]>(initialDatePlans);
-  const [allLogs, setAllLogs] = useState<FoodLogWithRecipe[]>(twoWeekLogs);
-  const [allPlans, setAllPlans] = useState<MealPlanWithRecipe[]>(twoWeekPlans);
   const [logTarget, setLogTarget] = useState<{
     recipe: Recipe;
     mealType: MealType;
   } | null>(null);
   const [pickerMealType, setPickerMealType] = useState<MealType | null>(null);
-  const [loading, setLoading] = useState(false);
 
   const isToday = date === todayStr();
 
   const fetchForDate = async (newDate: string) => {
-    setLoading(true);
     try {
       const [r1, r2] = await Promise.all([
         fetch(`/api/food-logs?date=${newDate}`).then((r) => r.json()),
@@ -139,27 +111,6 @@ export function DashboardClient({
       setDatePlans((r2.plans ?? []) as MealPlanWithRecipe[]);
     } catch {
       toast.error("取得に失敗しました");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const refreshTwoWeek = async () => {
-    const today = todayStr();
-    const start = addDays(today, -13);
-    try {
-      const [r1, r2] = await Promise.all([
-        fetch(`/api/food-logs?start=${start}&end=${today}`).then((r) =>
-          r.json(),
-        ),
-        fetch(`/api/plan/week?start=${start}&end=${today}`).then((r) =>
-          r.json(),
-        ),
-      ]);
-      if (!r1.error) setAllLogs(r1.logs as FoodLogWithRecipe[]);
-      setAllPlans((r2.plans ?? []) as MealPlanWithRecipe[]);
-    } catch {
-      // ignore
     }
   };
 
@@ -173,31 +124,6 @@ export function DashboardClient({
     ...dateLogs.map(logToEntry),
     ...datePlans.map(planToEntry),
   ];
-
-  const totalProteinToday = dateEntries.reduce((s, e) => s + e.protein_g, 0);
-  const totalKcalToday = dateEntries.reduce((s, e) => s + e.kcal, 0);
-
-  const repeatLog = async (log: FoodLogWithRecipe, mealType: MealType) => {
-    try {
-      const res = await fetch("/api/food-logs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipe_id: log.recipe_id,
-          logged_date: date,
-          meal_type: mealType,
-          servings: log.servings,
-          overrides: log.overrides ?? null,
-        }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      toast.success(`${log.recipe.title}を追加しました`);
-      await Promise.all([fetchForDate(date), refreshTwoWeek()]);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "記録に失敗しました");
-    }
-  };
 
   const deleteEntry = async (entry: Entry) => {
     try {
@@ -216,7 +142,7 @@ export function DashboardClient({
         const data = await res.json();
         if (data.error) throw new Error(data.error);
       }
-      await Promise.all([fetchForDate(date), refreshTwoWeek()]);
+      await fetchForDate(date);
     } catch {
       toast.error("削除に失敗しました");
     }
@@ -237,37 +163,6 @@ export function DashboardClient({
     },
     {} as Record<MealType, Entry[]>,
   );
-
-  // Last 7 days data
-  const dailyEntries = (d: string): Entry[] => [
-    ...allLogs.filter((l) => l.logged_date === d).map(logToEntry),
-    ...allPlans.filter((p) => p.planned_date === d).map(planToEntry),
-  ];
-  const weekData = Array.from({ length: 7 }, (_, i) => {
-    const d = addDays(todayStr(), -6 + i);
-    const entries = dailyEntries(d);
-    return {
-      date: d,
-      protein_g: Math.round(entries.reduce((s, e) => s + e.protein_g, 0)),
-      kcal: Math.round(entries.reduce((s, e) => s + e.kcal, 0)),
-    };
-  });
-
-  const todayDate = todayStr();
-  const lastWeekStart = addDays(todayDate, -6);
-  const lastWeekDays = Array.from({ length: 7 }, (_, i) =>
-    addDays(lastWeekStart, i),
-  );
-  const lastWeekTotals = lastWeekDays.map((d) => {
-    const entries = dailyEntries(d);
-    return {
-      protein: entries.reduce((s, e) => s + e.protein_g, 0),
-      kcal: entries.reduce((s, e) => s + e.kcal, 0),
-    };
-  });
-  const lastWeekProteinAvg =
-    lastWeekTotals.reduce((s, t) => s + t.protein, 0) / 7;
-  const lastWeekKcalAvg = lastWeekTotals.reduce((s, t) => s + t.kcal, 0) / 7;
 
   return (
     <div className="flex flex-col">
@@ -306,68 +201,7 @@ export function DashboardClient({
           )}
         </div>
 
-        {/* Stats: 2 cards (protein + kcal), each with today and 7-day avg */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <Card>
-            <CardContent className="py-3 space-y-2">
-              <div className="flex items-baseline justify-between">
-                <span className="text-sm text-muted-foreground">
-                  タンパク質
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  目安 {proteinTarget}g
-                </span>
-              </div>
-              <div className="flex items-baseline gap-3">
-                <div>
-                  <span className="text-3xl font-bold text-primary">
-                    {Math.round(totalProteinToday)}
-                  </span>
-                  <span className="text-sm text-muted-foreground"> g</span>
-                  <p className="text-xs text-muted-foreground">今日</p>
-                </div>
-                <div className="border-l border-border pl-3">
-                  <span className="text-xl font-semibold">
-                    {Math.round(lastWeekProteinAvg)}
-                  </span>
-                  <span className="text-xs text-muted-foreground"> g/日</span>
-                  <p className="text-xs text-muted-foreground">7日平均</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="py-3 space-y-2">
-              <div className="flex items-baseline justify-between">
-                <span className="text-sm text-muted-foreground">カロリー</span>
-                <span className="text-xs text-muted-foreground">
-                  目安 {calorieTarget}kcal
-                </span>
-              </div>
-              <div className="flex items-baseline gap-3">
-                <div>
-                  <span className="text-3xl font-bold text-warning">
-                    {Math.round(totalKcalToday)}
-                  </span>
-                  <span className="text-sm text-muted-foreground"> kcal</span>
-                  <p className="text-xs text-muted-foreground">今日</p>
-                </div>
-                <div className="border-l border-border pl-3">
-                  <span className="text-xl font-semibold">
-                    {Math.round(lastWeekKcalAvg)}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {" "}
-                    kcal/日
-                  </span>
-                  <p className="text-xs text-muted-foreground">7日平均</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Today's meals: minimal */}
+        {/* Today's meals */}
         <Card>
           <CardContent className="p-0 divide-y divide-border">
             {MEAL_TYPES.map((mt) => {
@@ -419,15 +253,6 @@ export function DashboardClient({
           </CardContent>
         </Card>
 
-        {/* Weekly chart */}
-        <Section title="ここ1週間の動き">
-          <WeeklyChart
-            data={weekData}
-            proteinTarget={proteinTarget}
-            calorieTarget={calorieTarget}
-          />
-        </Section>
-
         {recipes.length === 0 && (
           <Card>
             <CardContent className="py-6 flex flex-col items-center gap-3">
@@ -468,7 +293,7 @@ export function DashboardClient({
         onLogged={async () => {
           setLogTarget(null);
           toast.success("追加しました");
-          await Promise.all([fetchForDate(date), refreshTwoWeek()]);
+          await fetchForDate(date);
         }}
       />
     </div>

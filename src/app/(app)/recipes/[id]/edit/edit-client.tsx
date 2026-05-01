@@ -21,8 +21,6 @@ function recipeToDraft(r: Recipe): DraftRecipe {
     title: r.title,
     title_en: r.title_en,
     description: r.description,
-    protein_g_per_serving: r.protein_g_per_serving,
-    calorie_kcal_per_serving: r.calorie_kcal_per_serving,
     prep_time_min: r.prep_time_min,
     is_meal_prep_friendly: r.is_meal_prep_friendly,
     meal_prep_days: r.meal_prep_days,
@@ -31,8 +29,6 @@ function recipeToDraft(r: Recipe): DraftRecipe {
     ingredients: (r.ingredients ?? []).map((ing) => ({
       ...ing,
       unit: ing.unit ?? "",
-      protein_g: typeof ing.protein_g === "number" ? ing.protein_g : null,
-      kcal_kcal: typeof ing.kcal_kcal === "number" ? ing.kcal_kcal : null,
       in_pantry: ing.in_pantry ?? false,
     })),
     steps: (r.steps ?? []).map((s, i) => ({ ...s, order: s.order ?? i + 1 })),

@@ -73,45 +73,14 @@ export function LogMealDialog({
       const baseAmount = Number(ing.amount) || 0;
       const next = Number(amounts[i]) || 0;
       if (next === baseAmount) return;
-      const baseProtein = typeof ing.protein_g === "number" ? ing.protein_g : 0;
-      const ratio = baseAmount > 0 ? baseProtein / baseAmount : 0;
-      const newProtein =
-        baseAmount > 0 ? Math.round(ratio * next * 10) / 10 : baseProtein;
       list.push({
         index: i,
         amount: String(next),
         unit: "g",
-        protein_g: newProtein,
       });
     });
     return list;
   }, [recipe, amounts]);
-
-  const previewProteinG = useMemo(() => {
-    if (!recipe?.ingredients?.length) {
-      return recipe?.protein_g_per_serving ?? null;
-    }
-    const baseTotal = recipe.ingredients.reduce(
-      (s, i) => s + (typeof i.protein_g === "number" ? i.protein_g : 0),
-      0,
-    );
-    if (baseTotal === 0) {
-      return recipe.protein_g_per_serving ?? null;
-    }
-    const overrideMap = new Map<number, FoodLogIngredientOverride>();
-    overrides.forEach((o) => overrideMap.set(o.index, o));
-    const overriddenTotal = recipe.ingredients.reduce((s, ing, i) => {
-      const o = overrideMap.get(i);
-      const protein =
-        o?.protein_g != null
-          ? o.protein_g
-          : typeof ing.protein_g === "number"
-            ? ing.protein_g
-            : 0;
-      return s + protein;
-    }, 0);
-    return Math.round(overriddenTotal * 10) / 10;
-  }, [recipe, overrides]);
 
   const submit = async () => {
     if (!recipe) return;
@@ -122,7 +91,8 @@ export function LogMealDialog({
         logged_date: date,
         meal_type: mealType,
         servings: 1,
-        overrides: overrides.length > 0 ? { ingredients: overrides } : null,
+        overrides:
+          overrides.length > 0 ? { ingredients: overrides } : null,
       };
       const res = await fetch("/api/food-logs", {
         method: "POST",
@@ -191,17 +161,7 @@ export function LogMealDialog({
               />
             </div>
 
-            {previewProteinG != null && (
-              <div className="text-sm bg-primary/5 border border-primary/20 rounded-md px-3 py-2">
-                <span className="text-muted-foreground">タンパク質: </span>
-                <span className="font-semibold text-primary">
-                  {previewProteinG}g
-                </span>
-              </div>
-            )}
-
-            {(recipe.ingredients?.some((i) => (i.unit ?? "") === "g") ??
-              false) && (
+            {(recipe.ingredients?.some((i) => (i.unit ?? "") === "g") ?? false) && (
               <div>
                 <button
                   type="button"

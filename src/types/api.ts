@@ -14,8 +14,6 @@ export interface DraftRecipe {
   title: string;
   title_en: string | null;
   description: string | null;
-  protein_g_per_serving: number | null;
-  calorie_kcal_per_serving: number | null;
   prep_time_min: number | null;
   is_meal_prep_friendly: boolean;
   meal_prep_days: number | null;
@@ -105,7 +103,6 @@ export interface PlanMapRequest {
 
 export interface PlanMapResponse {
   plans_created: number;
-  total_protein_g: number;
 }
 
 // Image

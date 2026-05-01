@@ -11,8 +11,6 @@ import {
   Play,
   UtensilsCrossed,
   Users,
-  Flame,
-  Beef,
   CalendarPlus,
   Pencil,
   Copy,
@@ -254,52 +252,33 @@ export function RecipeDetailClient({
         />
 
         {/* Stats row */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {recipe.protein_g_per_serving && (
-            <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-md px-3 py-2.5">
-              <Beef className="w-4 h-4 text-primary flex-shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground">タンパク質</p>
-                <p className="text-sm font-semibold text-primary">
-                  {recipe.protein_g_per_serving}g
-                </p>
+        {(recipe.prep_time_min ||
+          (recipe.servings && recipe.servings > 1)) && (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {recipe.prep_time_min && (
+              <div className="flex items-center gap-2 bg-card border border-border rounded-md px-3 py-2.5">
+                <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground">調理時間</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {recipe.prep_time_min}分
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
-          {recipe.calorie_kcal_per_serving && (
-            <div className="flex items-center gap-2 bg-card border border-border rounded-md px-3 py-2.5">
-              <Flame className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground">カロリー</p>
-                <p className="text-sm font-semibold text-foreground">
-                  {recipe.calorie_kcal_per_serving}kcal
-                </p>
+            )}
+            {recipe.servings && recipe.servings > 1 && (
+              <div className="flex items-center gap-2 bg-card border border-border rounded-md px-3 py-2.5">
+                <Users className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground">食分</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {recipe.servings}食分
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
-          {recipe.prep_time_min && (
-            <div className="flex items-center gap-2 bg-card border border-border rounded-md px-3 py-2.5">
-              <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground">調理時間</p>
-                <p className="text-sm font-semibold text-foreground">
-                  {recipe.prep_time_min}分
-                </p>
-              </div>
-            </div>
-          )}
-          {recipe.servings && recipe.servings > 1 && (
-            <div className="flex items-center gap-2 bg-card border border-border rounded-md px-3 py-2.5">
-              <Users className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground">食分</p>
-                <p className="text-sm font-semibold text-foreground">
-                  {recipe.servings}食分
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Ingredients */}
         <Section
@@ -346,12 +325,6 @@ export function RecipeDetailClient({
                       </div>
                       <div className="text-right flex-shrink-0">
                         <p className="text-sm">{amountText}</p>
-                        {typeof ing.protein_g === "number" &&
-                          ing.protein_g > 0 && (
-                            <p className="text-xs text-primary">
-                              P{ing.protein_g}g
-                            </p>
-                          )}
                       </div>
                     </div>
                   );

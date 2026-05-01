@@ -103,12 +103,11 @@ export function RecipePickerDialog({
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{r.title}</p>
-                      <div className="flex gap-2 text-xs text-muted-foreground">
-                        {r.protein_g_per_serving && (
-                          <span>P{r.protein_g_per_serving}g</span>
-                        )}
-                        {r.prep_time_min && <span>{r.prep_time_min}分</span>}
-                      </div>
+                      {r.prep_time_min && (
+                        <div className="flex gap-2 text-xs text-muted-foreground">
+                          <span>{r.prep_time_min}分</span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
