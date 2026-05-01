@@ -36,7 +36,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user && pathname === "/") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/recipes", request.url));
   }
 
   return supabaseResponse;

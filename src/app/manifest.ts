@@ -4,10 +4,9 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "CookGo",
     short_name: "CookGo",
-    description:
-      "撮るだけ・選ぶだけで、タンパク質の水位が見えて、料理のレパートリーが増えていく。",
-    start_url: "/dashboard",
-    id: "/dashboard",
+    description: "料理を楽しむためのレシピ管理アプリ",
+    start_url: "/recipes",
+    id: "/recipes",
     display: "standalone",
     background_color: "#ffffff",
     theme_color: "#10b981",

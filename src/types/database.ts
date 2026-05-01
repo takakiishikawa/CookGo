@@ -4,7 +4,6 @@ export interface RecipeIngredient {
   name_vi: string | null;
   amount: string;
   unit: string | null;
-  in_pantry: boolean;
   category: string | null;
 }
 
@@ -34,6 +33,7 @@ export interface Recipe {
   is_tried: boolean;
   meal_prep_days: number | null;
   image_url: string | null;
+  source_url: string | null;
   ingredients: RecipeIngredient[] | null;
   steps: RecipeStep[] | null;
   ai_generated: boolean;
@@ -41,85 +41,20 @@ export interface Recipe {
   created_at: string;
 }
 
-export interface MealPlan {
-  id: string;
-  user_id: string;
-  recipe_id: string;
-  planned_date: string;
-  meal_type: "breakfast" | "lunch" | "dinner";
-  servings: number;
-  repeat_rule: "none" | "daily" | "weekdays" | "custom";
-  repeat_days: number[] | null;
-  repeat_until: string | null;
-  created_at: string;
-}
-
-export interface MealPlanWithRecipe extends MealPlan {
-  recipe: Pick<Recipe, "id" | "title" | "title_en" | "image_url">;
-}
-
-export interface PantryItem {
-  id: string;
-  user_id: string;
-  name: string;
-  name_en: string | null;
-  name_vi: string | null;
-  image_url: string | null;
-  category: string | null;
-  in_stock: boolean;
-  created_at: string;
-}
-
-export interface ShoppingListItem {
-  id: string;
-  user_id: string;
-  name: string;
-  name_en: string | null;
-  name_vi: string | null;
-  image_url: string | null;
-  amount: string | null;
-  checked: boolean;
-  added_to_pantry: boolean;
-  created_at: string;
-}
-
-export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
-
-export const MEAL_TYPE_LABELS: Record<MealType, string> = {
-  breakfast: "朝食",
-  lunch: "昼食",
-  dinner: "夕食",
-  snack: "間食",
-};
-
-export const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
-
-export interface FoodLogIngredientOverride {
+export interface RecipeShoppingStateItem {
   index: number;
-  amount?: string;
-  unit?: string | null;
+  is_needed: boolean;
+  is_purchased: boolean;
 }
 
-export interface FoodLogOverrides {
-  ingredients?: FoodLogIngredientOverride[];
-}
-
-export interface FoodLog {
-  id: string;
+export interface RecipeShoppingState {
   user_id: string;
   recipe_id: string;
-  logged_date: string;
-  meal_type: MealType;
-  servings: number;
-  overrides: FoodLogOverrides | null;
-  created_at: string;
+  state: { items: RecipeShoppingStateItem[] };
+  updated_at: string;
 }
 
-export interface FoodLogWithRecipe extends FoodLog {
-  recipe: Pick<Recipe, "id" | "title" | "title_en" | "image_url" | "servings">;
-}
-
-export const PANTRY_CATEGORIES = [
+export const INGREDIENT_CATEGORIES = [
   "タンパク源",
   "野菜",
   "調味料",

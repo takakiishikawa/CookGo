@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useState } from "react";
 import { GripVertical, Minus, Plus, RefreshCw, Trash2 } from "lucide-react";
 import {
   Button,
@@ -13,11 +13,7 @@ import {
   toast,
 } from "@takaki/go-design-system";
 import type { DraftRecipe } from "@/types/api";
-import type {
-  RecipeIngredient,
-  RecipeStep,
-  PantryItem,
-} from "@/types/database";
+import type { RecipeIngredient, RecipeStep } from "@/types/database";
 
 const INGREDIENT_CATEGORIES = [
   { value: "protein", label: "タンパク源" },
@@ -34,7 +30,6 @@ interface RecipeEditorProps {
   onSave: (recipe: DraftRecipe) => Promise<void> | void;
   onCancel?: () => void;
   cancelLabel?: string;
-  pantryItems?: PantryItem[];
 }
 
 function num(v: unknown): number {
@@ -48,13 +43,11 @@ export function RecipeEditor({
   onSave,
   onCancel,
   cancelLabel = "キャンセル",
-  pantryItems = [],
 }: RecipeEditorProps) {
   const [draft, setDraft] = useState<DraftRecipe>(() => ({
     ...initial,
     servings: 1,
   }));
-  const datalistId = useId();
 
   const setField = <K extends keyof DraftRecipe>(
     key: K,
@@ -81,7 +74,6 @@ export function RecipeEditor({
           name_vi: null,
           amount: "",
           unit: "g",
-          in_pantry: false,
           category: "other",
         },
       ],
@@ -235,13 +227,6 @@ export function RecipeEditor({
           </Button>
         }
       >
-        {pantryItems.length > 0 && (
-          <datalist id={datalistId}>
-            {pantryItems.map((p) => (
-              <option key={p.id} value={p.name} />
-            ))}
-          </datalist>
-        )}
         <div className="space-y-2">
           {draft.ingredients.length === 0 && (
             <p className="text-sm text-muted-foreground">食材がありません</p>
@@ -254,7 +239,6 @@ export function RecipeEditor({
                   <div className="flex items-center gap-2">
                     <Input
                       placeholder="食材名"
-                      list={pantryItems.length > 0 ? datalistId : undefined}
                       value={ing.name}
                       onChange={(e) =>
                         setIngredient(i, { ...ing, name: e.target.value })

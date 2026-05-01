@@ -20,7 +20,7 @@ export default function LoginRoute() {
     <LoginPage
       productName="CookGo"
       productLogo={<Leaf className="h-7 w-7" />}
-      tagline="撮るだけ・選ぶだけで、タンパク質の水位が見えて、料理のレパートリーが増えていく。"
+      tagline="料理を楽しむためのレシピ管理アプリ。"
       onGoogleSignIn={handleGoogleSignIn}
     />
   );

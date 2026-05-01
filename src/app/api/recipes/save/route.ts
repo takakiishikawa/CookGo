@@ -2,20 +2,22 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { DB_SCHEMA } from "@/lib/constants";
 import { fetchRecipeImage } from "@/lib/image-query";
+import { generateStepImageQueries } from "@/lib/step-image-queries";
 import { translateNames, translateTitle } from "@/lib/translate";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   DraftRecipe,
   RecipeSaveRequest,
   RecipeSaveResponse,
 } from "@/types/api";
-import type { RecipeIngredient, RecipeSourceTag } from "@/types/database";
+import type {
+  RecipeIngredient,
+  RecipeSourceTag,
+  RecipeStep,
+} from "@/types/database";
 
 async function enrichIngredients(
   ingredients: RecipeIngredient[],
-  pantryNames: Set<string>,
 ): Promise<RecipeIngredient[]> {
-  // 翻訳または「other / 未指定」カテゴリ補完が必要な食材
   const needsWork = Array.from(
     new Set(
       ingredients
@@ -41,7 +43,6 @@ async function enrichIngredients(
       name_vi: ing.name_vi ?? t?.vi ?? null,
       amount: ing.amount ?? "",
       unit: ing.unit ?? "",
-      in_pantry: pantryNames.has((ing.name ?? "").toLowerCase()),
       category:
         ing.category && ing.category !== "other"
           ? ing.category
@@ -50,16 +51,32 @@ async function enrichIngredients(
   });
 }
 
+async function enhanceSteps(
+  draft: DraftRecipe,
+  ingredients: RecipeIngredient[],
+): Promise<RecipeStep[]> {
+  const baseSteps = draft.steps ?? [];
+  if (baseSteps.length === 0) return baseSteps;
+  const queries = await generateStepImageQueries({
+    title: draft.title,
+    title_en: draft.title_en,
+    description: draft.description,
+    ingredients,
+    steps: baseSteps,
+  });
+  return baseSteps.map((s, i) => ({
+    ...s,
+    image_query: queries[i] ?? s.image_query,
+  }));
+}
+
 async function buildPayload(
   draft: DraftRecipe,
   imageUrl: string | null,
-  pantryNames: Set<string>,
   source_tag: RecipeSourceTag,
 ) {
-  const ingredients = await enrichIngredients(
-    draft.ingredients ?? [],
-    pantryNames,
-  );
+  const ingredients = await enrichIngredients(draft.ingredients ?? []);
+  const steps = await enhanceSteps(draft, ingredients);
   return {
     title: draft.title,
     title_en: draft.title_en ?? null,
@@ -67,27 +84,15 @@ async function buildPayload(
     prep_time_min: draft.prep_time_min,
     is_meal_prep_friendly: false,
     meal_prep_days: null,
-    servings: 1,
+    servings: draft.servings ?? 1,
     ingredients,
-    steps: draft.steps ?? [],
+    steps,
     ai_generated: source_tag === "ai_suggest",
     is_tried: false,
     image_url: imageUrl,
     source_tag,
+    source_url: draft.source_url ?? null,
   };
-}
-
-async function getPantryNames(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<Set<string>> {
-  const { data } = await supabase
-    .schema(DB_SCHEMA)
-    .from("pantry_items")
-    .select("name")
-    .eq("user_id", userId)
-    .eq("in_stock", true);
-  return new Set((data ?? []).map((p) => p.name.toLowerCase()));
 }
 
 async function ensureTitleEn(draft: DraftRecipe): Promise<string | null> {
@@ -120,7 +125,6 @@ export async function POST(request: Request) {
           ? "delivery"
           : "self";
 
-    const pantryNames = await getPantryNames(supabase, user.id);
     const titleEn = await ensureTitleEn(draft);
     const enrichedDraft: DraftRecipe = { ...draft, title_en: titleEn };
     const imageUrl = await fetchRecipeImage({
@@ -130,12 +134,7 @@ export async function POST(request: Request) {
       ingredients: enrichedDraft.ingredients ?? [],
     });
 
-    const payload = await buildPayload(
-      enrichedDraft,
-      imageUrl,
-      pantryNames,
-      source_tag,
-    );
+    const payload = await buildPayload(enrichedDraft, imageUrl, source_tag);
 
     const { data, error } = await supabase
       .schema(DB_SCHEMA)
@@ -198,7 +197,6 @@ export async function PUT(request: Request) {
     if (!existing)
       return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const pantryNames = await getPantryNames(supabase, user.id);
     const titleEn = await ensureTitleEn(draft);
     const enrichedDraft: DraftRecipe = { ...draft, title_en: titleEn };
 
@@ -223,12 +221,7 @@ export async function PUT(request: Request) {
         ? requested
         : ((existing.source_tag as RecipeSourceTag | null) ?? "self");
 
-    const payload = await buildPayload(
-      enrichedDraft,
-      imageUrl,
-      pantryNames,
-      source_tag,
-    );
+    const payload = await buildPayload(enrichedDraft, imageUrl, source_tag);
 
     const { error } = await supabase
       .schema(DB_SCHEMA)

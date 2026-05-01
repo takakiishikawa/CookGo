@@ -73,7 +73,6 @@ function normalizeIngredient(raw: unknown): RecipeIngredient | null {
         ? String(r.amount)
         : (asString(r.amount) ?? ""),
     unit: asString(r.unit) ?? "",
-    in_pantry: r.in_pantry === true,
     category: asString(r.category),
   };
 }

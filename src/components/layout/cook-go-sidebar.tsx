@@ -4,12 +4,8 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Home,
   BookOpen,
-  ShoppingCart,
-  Archive,
   Settings,
-  CalendarDays,
   Leaf,
   ChevronsUpDown,
   Check,
@@ -59,17 +55,15 @@ const GO_APPS = [
 ] as const;
 
 const navItems = [
-  { href: "/dashboard", icon: Home, label: "ダッシュボード" },
-  { href: "/plan", icon: CalendarDays, label: "献立" },
   { href: "/recipes", icon: BookOpen, label: "レシピ" },
-  { href: "/shopping", icon: ShoppingCart, label: "買い物リスト" },
-  { href: "/pantry", icon: Archive, label: "食材庫" },
+];
+
+const miniMenuItems = [
   { href: "/training", icon: Dumbbell, label: "トレーニング" },
   { href: "/body", icon: Scale, label: "ボディ" },
 ];
 
 function isActive(href: string, pathname: string) {
-  if (href === "/dashboard") return pathname === "/dashboard";
   return pathname.startsWith(href);
 }
 
@@ -192,6 +186,28 @@ export function CookGoSidebar() {
                     <Link href={href}>
                       <Icon className="h-4 w-4 shrink-0" />
                       {label}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* minimenu（PhysicalGoから引き継いだボディ管理） */}
+        <SidebarGroup className="mt-auto">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {miniMenuItems.map(({ href, icon: Icon, label }) => (
+                <SidebarMenuItem key={href}>
+                  <SidebarMenuButton
+                    asChild
+                    size="sm"
+                    isActive={isActive(href, pathname)}
+                  >
+                    <Link href={href}>
+                      <Icon className="h-3.5 w-3.5 shrink-0" />
+                      <span className="text-xs">{label}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

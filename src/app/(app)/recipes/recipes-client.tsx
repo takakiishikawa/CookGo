@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Plus,
+  Search,
   UtensilsCrossed,
   CheckCircle2,
-  CalendarPlus,
   Copy,
   Trash2,
 } from "lucide-react";
@@ -19,14 +19,14 @@ import {
   CardContent,
   Skeleton,
   PageHeader,
+  Input,
   toast,
 } from "@takaki/go-design-system";
 import { AppHeader } from "@/components/layout/app-header";
-import { Recipe, MealType, RECIPE_SOURCE_LABELS } from "@/types/database";
+import { Recipe, RECIPE_SOURCE_LABELS } from "@/types/database";
 import { useFoodImage } from "@/hooks/use-food-image";
 import { createClient } from "@/lib/supabase/client";
 import { db } from "@/lib/db";
-import { LogMealDialog } from "@/components/log-meal-dialog";
 
 function RecipeImage({ recipe }: { recipe: Recipe }) {
   const query = recipe.title_en ?? recipe.title;
@@ -58,13 +58,11 @@ function RecipeImage({ recipe }: { recipe: Recipe }) {
 function RecipeCard({
   recipe,
   onToggleTried,
-  onLog,
   onDelete,
   onDuplicate,
 }: {
   recipe: Recipe;
   onToggleTried: (id: string, tried: boolean) => void;
-  onLog: (recipe: Recipe) => void;
   onDelete: (recipe: Recipe) => void;
   onDuplicate: (recipe: Recipe) => void;
 }) {
@@ -97,24 +95,13 @@ function RecipeCard({
             <div className="flex gap-1">
               <Button
                 size="icon"
-                variant="default"
-                onClick={(e) => {
-                  e.preventDefault();
-                  onLog(recipe);
-                }}
-                title="今日に追加"
-                className="flex-1"
-              >
-                <CalendarPlus className="w-3.5 h-3.5" />
-              </Button>
-              <Button
-                size="icon"
                 variant="outline"
                 onClick={(e) => {
                   e.preventDefault();
                   onDuplicate(recipe);
                 }}
                 title="複製"
+                className="flex-1"
               >
                 <Copy className="w-3.5 h-3.5" />
               </Button>
@@ -159,8 +146,18 @@ export function RecipesClient({ recipes: initialRecipes }: RecipesClientProps) {
   const router = useRouter();
   const supabase = createClient();
   const [recipes, setRecipes] = useState<Recipe[]>(initialRecipes);
-  const [logTarget, setLogTarget] = useState<Recipe | null>(null);
-  const [defaultMealType] = useState<MealType>("dinner");
+  const [query, setQuery] = useState("");
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return recipes;
+    return recipes.filter(
+      (r) =>
+        r.title.toLowerCase().includes(q) ||
+        (r.title_en?.toLowerCase().includes(q) ?? false) ||
+        (r.description?.toLowerCase().includes(q) ?? false),
+    );
+  }, [recipes, query]);
 
   const deleteRecipe = async (recipe: Recipe) => {
     setRecipes((prev) => prev.filter((r) => r.id !== recipe.id));
@@ -224,20 +221,35 @@ export function RecipesClient({ recipes: initialRecipes }: RecipesClientProps) {
           }
         />
 
+        <div className="relative max-w-md">
+          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+          <Input
+            placeholder="レシピを検索..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
         {recipes.length === 0 ? (
           <EmptyState
             icon={<UtensilsCrossed className="w-6 h-6" />}
             title="レシピがまだありません"
             description="「レシピを追加」から作りましょう"
           />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={<Search className="w-6 h-6" />}
+            title="該当するレシピがありません"
+            description="検索キーワードを変えてみてください"
+          />
         ) : (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-            {recipes.map((recipe) => (
+            {filtered.map((recipe) => (
               <RecipeCard
                 key={recipe.id}
                 recipe={recipe}
                 onToggleTried={toggleTried}
-                onLog={setLogTarget}
                 onDelete={deleteRecipe}
                 onDuplicate={duplicateRecipe}
               />
@@ -245,16 +257,6 @@ export function RecipesClient({ recipes: initialRecipes }: RecipesClientProps) {
           </div>
         )}
       </div>
-
-      <LogMealDialog
-        recipe={logTarget}
-        defaultMealType={defaultMealType}
-        onClose={() => setLogTarget(null)}
-        onLogged={() => {
-          toast.success("追加しました");
-          setLogTarget(null);
-        }}
-      />
     </div>
   );
 }

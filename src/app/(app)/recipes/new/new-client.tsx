@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, RefreshCw, Sparkles, PencilLine } from "lucide-react";
+import {
+  ArrowLeft,
+  ExternalLink,
+  Globe,
+  PencilLine,
+  RefreshCw,
+  Sparkles,
+  UtensilsCrossed,
+} from "lucide-react";
 import {
   Button,
   Input,
@@ -20,35 +28,47 @@ import {
 import { AppHeader } from "@/components/layout/app-header";
 import { RecipeEditor } from "@/components/recipe-editor";
 import type { DraftRecipe } from "@/types/api";
-import type { PantryItem } from "@/types/database";
+import type {
+  RecipeRecommendation,
+  RecipeRecommendResponse,
+} from "@/app/api/recipes/recommend/route";
 
-type Mode = "name" | "ai";
-type Step = "input" | "candidates" | "edit";
+type Mode = "name" | "ai" | "url";
+type Step = "input" | "recommendations" | "paste" | "edit";
 
-export function NewRecipeClient({
-  pantryItems,
-}: {
-  pantryItems: PantryItem[];
-}) {
+export function NewRecipeClient() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("name");
   const [step, setStep] = useState<Step>("input");
 
-  const [titleInput, setTitleInput] = useState("");
-  const [conditions, setConditions] = useState("");
-  const [generating, setGenerating] = useState(false);
+  // shared
+  const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
-
   const [draft, setDraft] = useState<DraftRecipe | null>(null);
-  const [candidates, setCandidates] = useState<DraftRecipe[]>([]);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
 
+  // mode: name
+  const [titleInput, setTitleInput] = useState("");
+
+  // mode: ai (web search)
+  const [aiQuery, setAiQuery] = useState("");
+  const [recommendations, setRecommendations] = useState<RecipeRecommendation[]>(
+    [],
+  );
+
+  // mode: url
+  const [urlInput, setUrlInput] = useState("");
+  const [pasteText, setPasteText] = useState("");
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+
+  // -----------------------------------------------------------------------
+  // 料理名から作る
+  // -----------------------------------------------------------------------
   const generateFromName = async () => {
     if (!titleInput.trim()) {
       toast.error("料理名を入力してください");
       return;
     }
-    setGenerating(true);
+    setBusy(true);
     try {
       const res = await fetch("/api/recipes/from-name", {
         method: "POST",
@@ -62,69 +82,110 @@ export function NewRecipeClient({
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "生成に失敗しました");
     } finally {
-      setGenerating(false);
+      setBusy(false);
     }
   };
 
-  const generateCandidates = async () => {
-    setGenerating(true);
-    try {
-      const res = await fetch("/api/recipes/suggest-candidates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conditions: conditions.trim() }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setCandidates(data.candidates as DraftRecipe[]);
-      setSelected(new Set());
-      setStep("candidates");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "生成に失敗しました");
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const toggleSelect = (i: number) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(i)) next.delete(i);
-      else next.add(i);
-      return next;
-    });
-  };
-
-  const saveSelectedCandidates = async () => {
-    if (selected.size === 0) {
-      toast.error("少なくとも1件選択してください");
+  // -----------------------------------------------------------------------
+  // AI推薦(web search)
+  // -----------------------------------------------------------------------
+  const fetchRecommendations = async () => {
+    if (!aiQuery.trim()) {
+      toast.error("条件を入力してください");
       return;
     }
-    setSaving(true);
+    setBusy(true);
+    setRecommendations([]);
     try {
-      const recipes = Array.from(selected).map((i) => candidates[i]);
-      const res = await fetch("/api/recipes/save-many", {
+      const res = await fetch("/api/recipes/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipes, source_tag: "ai_suggest" }),
+        body: JSON.stringify({ query: aiQuery.trim() }),
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      toast.success(`${data.recipe_ids.length}件のレシピを登録しました`);
-      router.push("/recipes");
-      router.refresh();
+      const data = (await res.json()) as
+        | RecipeRecommendResponse
+        | { error: string };
+      if ("error" in data) throw new Error(data.error);
+      setRecommendations(data.recommendations);
+      setStep("recommendations");
+      if (data.recommendations.length === 0) {
+        toast.info("該当するレシピが見つかりませんでした");
+      }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "保存に失敗しました");
+      toast.error(err instanceof Error ? err.message : "検索に失敗しました");
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   };
 
+  // -----------------------------------------------------------------------
+  // URL取り込み (mode: url の直接入力 or 推薦カードの「作ってみる」)
+  // -----------------------------------------------------------------------
+  const importFromUrl = async (url: string) => {
+    if (!url.trim()) {
+      toast.error("URLを入力してください");
+      return;
+    }
+    setBusy(true);
+    setPendingUrl(url);
+    try {
+      const res = await fetch("/api/recipes/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim() }),
+      });
+      if (res.status === 422) {
+        // fetch 失敗 → ペースト方式へ
+        const data = await res.json();
+        toast.warning(data.message ?? "サイトの取得に失敗しました");
+        setStep("paste");
+        return;
+      }
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setDraft(data.draft as DraftRecipe);
+      setStep("edit");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "取り込みに失敗しました");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const importFromText = async () => {
+    if (!pasteText.trim()) {
+      toast.error("レシピ本文を貼り付けてください");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/recipes/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: pasteText.trim(),
+          url: pendingUrl ?? undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setDraft(data.draft as DraftRecipe);
+      setStep("edit");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "取り込みに失敗しました");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // 保存
+  // -----------------------------------------------------------------------
   const saveSingleDraft = async (recipe: DraftRecipe) => {
     setSaving(true);
     try {
       const source_tag =
-        recipe.source_tag ?? (mode === "ai" ? "ai_suggest" : "self");
+        recipe.source_tag ?? (mode === "name" ? "self" : "ai_suggest");
       const res = await fetch("/api/recipes/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -144,11 +205,14 @@ export function NewRecipeClient({
 
   const back = () => {
     if (step === "edit") {
-      setStep(mode === "ai" ? "candidates" : "input");
+      if (mode === "ai") setStep("recommendations");
+      else if (mode === "url") setStep(pendingUrl ? "paste" : "input");
+      else setStep("input");
       return;
     }
-    if (step === "candidates") {
+    if (step === "recommendations" || step === "paste") {
       setStep("input");
+      setPendingUrl(null);
       return;
     }
     router.push("/recipes");
@@ -164,23 +228,28 @@ export function NewRecipeClient({
           </Button>
           <PageHeader
             title="レシピを追加"
-            description="料理名から作るか、AIに提案してもらえます"
+            description="料理名から作る・AIに探してもらう・URLから取り込む"
           />
         </div>
 
         {step === "input" && (
           <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
-            <TabsList className="grid grid-cols-2 w-full">
+            <TabsList className="grid grid-cols-3 w-full">
               <TabsTrigger value="name" className="gap-1.5">
                 <PencilLine className="w-3.5 h-3.5" />
                 料理名から作る
               </TabsTrigger>
               <TabsTrigger value="ai" className="gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
-                AIに提案してもらう
+                AIに探してもらう
+              </TabsTrigger>
+              <TabsTrigger value="url" className="gap-1.5">
+                <Globe className="w-3.5 h-3.5" />
+                URLから取り込む
               </TabsTrigger>
             </TabsList>
 
+            {/* 料理名から作る */}
             <TabsContent value="name" className="mt-4 space-y-3">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">料理名</label>
@@ -188,109 +257,176 @@ export function NewRecipeClient({
                   value={titleInput}
                   onChange={(e) => setTitleInput(e.target.value)}
                   placeholder="例: 生姜焼き定食 / 冷奴 / アボカド和え"
-                  disabled={generating}
+                  disabled={busy}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") generateFromName();
                   }}
                 />
                 <p className="text-xs text-muted-foreground">
-                  入力した料理名をAIが詳細レシピに展開し、編集画面で調整できます
+                  料理名から AI が詳細レシピを生成します
                 </p>
               </div>
               <Button
                 size="sm"
                 onClick={generateFromName}
-                disabled={generating}
+                disabled={busy}
                 className="w-full gap-1.5"
               >
-                {generating ? (
+                {busy ? (
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                 ) : (
                   <Sparkles className="w-3.5 h-3.5" />
                 )}
-                {generating ? "生成中..." : "生成"}
+                {busy ? "生成中..." : "生成"}
               </Button>
             </TabsContent>
 
+            {/* AIに探してもらう (web search) */}
             <TabsContent value="ai" className="mt-4 space-y-3">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">条件(自由記述)</label>
+                <label className="text-sm font-medium">どんなレシピを探す?</label>
                 <Textarea
-                  rows={4}
-                  value={conditions}
-                  onChange={(e) => setConditions(e.target.value)}
-                  placeholder="例: 鶏肉を使いたい / さっぱり系で作り置き / 朝食向けの簡単なもの"
-                  disabled={generating}
+                  rows={3}
+                  value={aiQuery}
+                  onChange={(e) => setAiQuery(e.target.value)}
+                  placeholder="例: 鶏胸肉を使った meal prep / ベトナム風朝食 / 高タンパク 簡単レシピ"
+                  disabled={busy}
                 />
                 <p className="text-xs text-muted-foreground">
-                  3〜5件の候補を提案。気に入ったものを複数選んで一括登録できます。
+                  日本語のレシピサイトから 5 件提案します
                 </p>
               </div>
               <Button
                 size="sm"
-                onClick={generateCandidates}
-                disabled={generating}
+                onClick={fetchRecommendations}
+                disabled={busy}
                 className="w-full gap-1.5"
               >
-                {generating ? (
+                {busy ? (
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                 ) : (
                   <Sparkles className="w-3.5 h-3.5" />
                 )}
-                {generating ? "提案中..." : "提案してもらう"}
+                {busy ? "検索中..." : "5件探す"}
+              </Button>
+            </TabsContent>
+
+            {/* URLから取り込む */}
+            <TabsContent value="url" className="mt-4 space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">レシピURL</label>
+                <Input
+                  type="url"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  placeholder="https://..."
+                  disabled={busy}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") importFromUrl(urlInput);
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  URL を解析して材料・手順を自動構造化します。取得できない場合は本文の貼り付け画面に切り替わります。
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => importFromUrl(urlInput)}
+                disabled={busy}
+                className="w-full gap-1.5"
+              >
+                {busy ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Globe className="w-3.5 h-3.5" />
+                )}
+                {busy ? "取り込み中..." : "URLから取り込む"}
               </Button>
             </TabsContent>
           </Tabs>
         )}
 
-        {step === "candidates" && (
+        {/* AI 推薦結果カード */}
+        {step === "recommendations" && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              登録したいレシピを選択してください（複数選択可）
+              気になるレシピで「作ってみる」を押すと取り込めます
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {candidates.map((c, i) => {
-                const active = selected.has(i);
-                return (
-                  <Card
-                    key={i}
-                    className={`cursor-pointer transition-all ${
-                      active
-                        ? "ring-2 ring-primary border-primary"
-                        : "border-border hover:border-primary/40"
-                    }`}
-                    onClick={() => toggleSelect(i)}
-                  >
-                    <CardContent className="p-3 space-y-2">
-                      <div className="flex items-start gap-2">
-                        <input
-                          type="checkbox"
-                          checked={active}
-                          onChange={() => toggleSelect(i)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <p className="font-semibold text-sm">{c.title}</p>
-                          {c.description && (
-                            <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                              {c.description}
-                            </p>
-                          )}
-                        </div>
+              {recommendations.map((r, i) => (
+                <Card key={i} className="overflow-hidden flex flex-col">
+                  <div className="aspect-video bg-muted overflow-hidden">
+                    {r.thumbnail ? (
+                      <img
+                        src={r.thumbnail}
+                        alt={r.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <UtensilsCrossed className="w-8 h-8 text-muted-foreground/40" />
                       </div>
-                      {c.prep_time_min && (
-                        <div className="flex flex-wrap gap-1">
-                          <Badge variant="secondary">
-                            {c.prep_time_min}分
-                          </Badge>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                    )}
+                  </div>
+                  <CardContent className="p-3 space-y-2 flex-1 flex flex-col">
+                    <p className="font-semibold text-sm leading-snug line-clamp-2">
+                      {r.title}
+                    </p>
+                    {r.summary && (
+                      <p className="text-xs text-muted-foreground line-clamp-3">
+                        {r.summary}
+                      </p>
+                    )}
+                    <div className="text-[10px] text-muted-foreground truncate">
+                      {(() => {
+                        try {
+                          return new URL(r.url).hostname;
+                        } catch {
+                          return r.url;
+                        }
+                      })()}
+                    </div>
+                    <div className="flex gap-1.5 mt-auto pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        asChild
+                        className="flex-1 gap-1.5"
+                      >
+                        <a
+                          href={r.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          元サイト
+                        </a>
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => importFromUrl(r.url)}
+                        disabled={busy}
+                        className="flex-1 gap-1.5"
+                      >
+                        {busy && pendingUrl === r.url && (
+                          <RefreshCw className="w-3 h-3 animate-spin" />
+                        )}
+                        作ってみる
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
+            {recommendations.length === 0 && (
+              <Card>
+                <CardContent className="py-6 text-sm text-muted-foreground text-center">
+                  該当するレシピが見つかりませんでした。条件を変えて再検索してください。
+                </CardContent>
+              </Card>
+            )}
             <div className="flex gap-2 sticky bottom-0 bg-background py-3 -mx-4 px-4 md:-mx-8 md:px-8 border-t border-border">
               <Button
                 size="sm"
@@ -298,25 +434,70 @@ export function NewRecipeClient({
                 className="flex-1"
                 onClick={() => setStep("input")}
               >
-                戻る
-              </Button>
-              <Button
-                size="sm"
-                className="flex-1 gap-1.5"
-                onClick={saveSelectedCandidates}
-                disabled={saving || selected.size === 0}
-              >
-                {saving && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                {saving ? "保存中..." : `${selected.size}件を登録`}
+                条件を変える
               </Button>
             </div>
           </div>
         )}
 
+        {/* テキスト貼り付け fallback */}
+        {step === "paste" && (
+          <div className="space-y-3">
+            <Card>
+              <CardContent className="p-3 text-sm space-y-2">
+                <Badge variant="outline">URL取得失敗</Badge>
+                {pendingUrl && (
+                  <p className="text-xs text-muted-foreground break-all">
+                    {pendingUrl}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  サイトから取得できなかったため、レシピ本文をコピーして下に貼り付けてください
+                </p>
+              </CardContent>
+            </Card>
+            <Textarea
+              rows={14}
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              placeholder="レシピのタイトル・材料・手順を含む本文をそのまま貼り付け"
+              disabled={busy}
+              className="font-mono text-xs"
+            />
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setPasteText("");
+                  setPendingUrl(null);
+                  setStep("input");
+                }}
+              >
+                戻る
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1 gap-1.5"
+                onClick={importFromText}
+                disabled={busy}
+              >
+                {busy ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+                {busy ? "取り込み中..." : "AIで構造化して取り込む"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* 編集モード */}
         {step === "edit" && draft && (
           <RecipeEditor
             initial={draft}
-            pantryItems={pantryItems}
             saving={saving}
             saveLabel="登録"
             onSave={saveSingleDraft}

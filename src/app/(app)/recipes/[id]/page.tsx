@@ -15,20 +15,9 @@ export default async function RecipeDetailPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/");
 
-  const [recipe, pantryItems] = await Promise.all([
-    db.recipes.getById(supabase, user.id, id),
-    db.pantry.getAll(supabase, user.id),
-  ]);
+  const recipe = await db.recipes.getById(supabase, user.id, id);
 
   if (!recipe) notFound();
 
-  return (
-    <RecipeDetailClient
-      recipe={recipe}
-      pantryItems={pantryItems.map((p) => ({
-        name: p.name,
-        in_stock: p.in_stock,
-      }))}
-    />
-  );
+  return <RecipeDetailClient recipe={recipe} />;
 }

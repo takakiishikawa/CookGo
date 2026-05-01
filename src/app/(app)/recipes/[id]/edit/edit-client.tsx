@@ -13,7 +13,7 @@ import {
 } from "@takaki/go-design-system";
 import { AppHeader } from "@/components/layout/app-header";
 import { RecipeEditor } from "@/components/recipe-editor";
-import type { Recipe, PantryItem } from "@/types/database";
+import type { Recipe } from "@/types/database";
 import type { DraftRecipe } from "@/types/api";
 
 function recipeToDraft(r: Recipe): DraftRecipe {
@@ -26,22 +26,16 @@ function recipeToDraft(r: Recipe): DraftRecipe {
     meal_prep_days: r.meal_prep_days,
     servings: r.servings,
     source_tag: r.source_tag ?? "self",
+    source_url: r.source_url,
     ingredients: (r.ingredients ?? []).map((ing) => ({
       ...ing,
       unit: ing.unit ?? "",
-      in_pantry: ing.in_pantry ?? false,
     })),
     steps: (r.steps ?? []).map((s, i) => ({ ...s, order: s.order ?? i + 1 })),
   };
 }
 
-export function EditRecipeClient({
-  recipe,
-  pantryItems,
-}: {
-  recipe: Recipe;
-  pantryItems: PantryItem[];
-}) {
+export function EditRecipeClient({ recipe }: { recipe: Recipe }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(recipe.image_url);
@@ -147,7 +141,6 @@ export function EditRecipeClient({
 
         <RecipeEditor
           initial={recipeToDraft(recipe)}
-          pantryItems={pantryItems}
           saving={saving}
           saveLabel="更新"
           onSave={save}
