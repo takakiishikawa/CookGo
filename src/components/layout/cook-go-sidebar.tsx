@@ -10,7 +10,6 @@ import {
   Wallet,
   Zap,
   ChefHat,
-  Palette,
   Sun,
   Moon,
   FileText,
@@ -56,12 +55,6 @@ const GO_APPS = [
     url: "https://cook-go-lovat.vercel.app/dashboard",
     color: "#16A34A",
     icon: ChefHat,
-  },
-  {
-    name: "DesignSystem",
-    url: "https://github.com/takakiishikawa/go-design-system",
-    color: "#7C3AED",
-    icon: Palette,
   },
 ];
 
