@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  images: {
+    // gallery / 詳細で使う外部画像ドメインを許可
+    remotePatterns: [
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "*.supabase.co" },
+    ],
+    // Vercel が WebP/AVIF を自動配信
+    formats: ["image/avif", "image/webp"],
+  },
   async headers() {
     return [
       {
