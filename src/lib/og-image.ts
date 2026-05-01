@@ -10,7 +10,7 @@ export async function fetchOgImage(url: string): Promise<string | null> {
           "Mozilla/5.0 (compatible; CookGoBot/1.0; +https://cook-go.vercel.app)",
         Accept: "text/html,application/xhtml+xml",
       },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(4000),
       redirect: "follow",
     });
     if (!res.ok) return null;

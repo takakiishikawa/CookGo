@@ -21,14 +21,6 @@ export interface DraftRecipe {
   source_url?: string | null;
 }
 
-// POST /api/recipes/from-name
-export interface RecipeFromNameRequest {
-  title: string;
-}
-export interface RecipeFromNameResponse {
-  recipe: DraftRecipe;
-}
-
 // POST /api/recipes/save (create new from draft)
 // PUT  /api/recipes/save?id=...  (update existing from draft)
 export interface RecipeSaveRequest {

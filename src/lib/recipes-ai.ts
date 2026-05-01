@@ -1,9 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { CLAUDE_SONNET } from "./constants";
+import { CLAUDE_HAIKU } from "./constants";
 import type { DraftRecipe } from "@/types/api";
 import type { RecipeIngredient, RecipeStep } from "@/types/database";
 
-const anthropic = new Anthropic();
+// Vercel 60秒制約に収めるため Haiku を使用(構造化のみで Sonnet は不要)
+const anthropic = new Anthropic({ maxRetries: 0 });
 
 export const SCHEMA_SAMPLE = `{
   "title": "豚の生姜焼き",
@@ -115,7 +116,7 @@ export function normalizeDraft(raw: RawDraft): DraftRecipe | null {
 
 export async function callClaudeJson(prompt: string): Promise<unknown> {
   const response = await anthropic.messages.create({
-    model: CLAUDE_SONNET,
+    model: CLAUDE_HAIKU,
     max_tokens: 4096,
     messages: [{ role: "user", content: prompt }],
   });

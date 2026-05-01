@@ -1,28 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ExternalLink,
   Globe,
-  PencilLine,
   RefreshCw,
   Sparkles,
   UtensilsCrossed,
 } from "lucide-react";
 import {
+  Badge,
   Button,
+  Card,
+  CardContent,
   Input,
-  Textarea,
+  PageHeader,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-  Card,
-  CardContent,
-  Badge,
-  PageHeader,
+  Textarea,
   toast,
 } from "@takaki/go-design-system";
 import { AppHeader } from "@/components/layout/app-header";
@@ -33,23 +32,23 @@ import type {
   RecipeRecommendResponse,
 } from "@/app/api/recipes/recommend/route";
 
-type Mode = "name" | "ai" | "url";
+type Mode = "url" | "ai";
 type Step = "input" | "recommendations" | "paste" | "edit";
+
+const RECOMMEND_TIMEOUT_MS = 90_000;
+const IMPORT_TIMEOUT_MS = 90_000;
 
 export function NewRecipeClient() {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("name");
+  const [mode, setMode] = useState<Mode>("url");
   const [step, setStep] = useState<Step>("input");
 
-  // shared
   const [busy, setBusy] = useState(false);
+  const [importingUrl, setImportingUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState<DraftRecipe | null>(null);
 
-  // mode: name
-  const [titleInput, setTitleInput] = useState("");
-
-  // mode: ai (web search)
+  // mode: ai
   const [aiQuery, setAiQuery] = useState("");
   const [recommendations, setRecommendations] = useState<RecipeRecommendation[]>(
     [],
@@ -60,40 +59,27 @@ export function NewRecipeClient() {
   const [pasteText, setPasteText] = useState("");
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
 
-  // -----------------------------------------------------------------------
-  // 料理名から作る
-  // -----------------------------------------------------------------------
-  const generateFromName = async () => {
-    if (!titleInput.trim()) {
-      toast.error("料理名を入力してください");
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await fetch("/api/recipes/from-name", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: titleInput.trim() }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setDraft(data.recipe as DraftRecipe);
-      setStep("edit");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "生成に失敗しました");
-    } finally {
-      setBusy(false);
-    }
-  };
+  // クリーンアップ用
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   // -----------------------------------------------------------------------
-  // AI推薦(web search)
+  // レシピを探す (web search)
   // -----------------------------------------------------------------------
   const fetchRecommendations = async () => {
     if (!aiQuery.trim()) {
       toast.error("条件を入力してください");
       return;
     }
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const timeout = setTimeout(() => controller.abort(), RECOMMEND_TIMEOUT_MS);
+
     setBusy(true);
     setRecommendations([]);
     try {
@@ -101,6 +87,7 @@ export function NewRecipeClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: aiQuery.trim() }),
+        signal: controller.signal,
       });
       const data = (await res.json()) as
         | RecipeRecommendResponse
@@ -112,8 +99,15 @@ export function NewRecipeClient() {
         toast.info("該当するレシピが見つかりませんでした");
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "検索に失敗しました");
+      const isAbort =
+        err instanceof DOMException && err.name === "AbortError";
+      if (isAbort) {
+        toast.error("検索がタイムアウトしました。条件を変えて試してください");
+      } else {
+        toast.error(err instanceof Error ? err.message : "検索に失敗しました");
+      }
     } finally {
+      clearTimeout(timeout);
       setBusy(false);
     }
   };
@@ -126,16 +120,22 @@ export function NewRecipeClient() {
       toast.error("URLを入力してください");
       return;
     }
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const timeout = setTimeout(() => controller.abort(), IMPORT_TIMEOUT_MS);
+
     setBusy(true);
+    setImportingUrl(url);
     setPendingUrl(url);
     try {
       const res = await fetch("/api/recipes/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url.trim() }),
+        signal: controller.signal,
       });
       if (res.status === 422) {
-        // fetch 失敗 → ペースト方式へ
         const data = await res.json();
         toast.warning(data.message ?? "サイトの取得に失敗しました");
         setStep("paste");
@@ -146,9 +146,17 @@ export function NewRecipeClient() {
       setDraft(data.draft as DraftRecipe);
       setStep("edit");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "取り込みに失敗しました");
+      const isAbort =
+        err instanceof DOMException && err.name === "AbortError";
+      if (isAbort) {
+        toast.error("取り込みがタイムアウトしました");
+      } else {
+        toast.error(err instanceof Error ? err.message : "取り込みに失敗しました");
+      }
     } finally {
+      clearTimeout(timeout);
       setBusy(false);
+      setImportingUrl(null);
     }
   };
 
@@ -184,8 +192,7 @@ export function NewRecipeClient() {
   const saveSingleDraft = async (recipe: DraftRecipe) => {
     setSaving(true);
     try {
-      const source_tag =
-        recipe.source_tag ?? (mode === "name" ? "self" : "ai_suggest");
+      const source_tag = recipe.source_tag ?? "ai_suggest";
       const res = await fetch("/api/recipes/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -206,8 +213,7 @@ export function NewRecipeClient() {
   const back = () => {
     if (step === "edit") {
       if (mode === "ai") setStep("recommendations");
-      else if (mode === "url") setStep(pendingUrl ? "paste" : "input");
-      else setStep("input");
+      else setStep(pendingUrl ? "paste" : "input");
       return;
     }
     if (step === "recommendations" || step === "paste") {
@@ -228,88 +234,22 @@ export function NewRecipeClient() {
           </Button>
           <PageHeader
             title="レシピを追加"
-            description="料理名から作る・AIに探してもらう・URLから取り込む"
+            description="URLから取り込む・AIにレシピを探してもらう"
           />
         </div>
 
         {step === "input" && (
           <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
-            <TabsList className="grid grid-cols-3 w-full">
-              <TabsTrigger value="name" className="gap-1.5">
-                <PencilLine className="w-3.5 h-3.5" />
-                料理名から作る
-              </TabsTrigger>
-              <TabsTrigger value="ai" className="gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                AIに探してもらう
-              </TabsTrigger>
+            <TabsList className="grid grid-cols-2 w-full">
               <TabsTrigger value="url" className="gap-1.5">
                 <Globe className="w-3.5 h-3.5" />
                 URLから取り込む
               </TabsTrigger>
+              <TabsTrigger value="ai" className="gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                レシピを探す
+              </TabsTrigger>
             </TabsList>
-
-            {/* 料理名から作る */}
-            <TabsContent value="name" className="mt-4 space-y-3">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">料理名</label>
-                <Input
-                  value={titleInput}
-                  onChange={(e) => setTitleInput(e.target.value)}
-                  placeholder="例: 生姜焼き定食 / 冷奴 / アボカド和え"
-                  disabled={busy}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") generateFromName();
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">
-                  料理名から AI が詳細レシピを生成します
-                </p>
-              </div>
-              <Button
-                size="sm"
-                onClick={generateFromName}
-                disabled={busy}
-                className="w-full gap-1.5"
-              >
-                {busy ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5" />
-                )}
-                {busy ? "生成中..." : "生成"}
-              </Button>
-            </TabsContent>
-
-            {/* AIに探してもらう (web search) */}
-            <TabsContent value="ai" className="mt-4 space-y-3">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">どんなレシピを探す?</label>
-                <Textarea
-                  rows={3}
-                  value={aiQuery}
-                  onChange={(e) => setAiQuery(e.target.value)}
-                  placeholder="例: 鶏胸肉を使った meal prep / ベトナム風朝食 / 高タンパク 簡単レシピ"
-                  disabled={busy}
-                />
-                <p className="text-xs text-muted-foreground">
-                  日本語のレシピサイトから 5 件提案します
-                </p>
-              </div>
-              <Button
-                size="sm"
-                onClick={fetchRecommendations}
-                disabled={busy}
-                className="w-full gap-1.5"
-              >
-                {busy ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5" />
-                )}
-                {busy ? "検索中..." : "5件探す"}
-              </Button>
-            </TabsContent>
 
             {/* URLから取り込む */}
             <TabsContent value="url" className="mt-4 space-y-3">
@@ -343,6 +283,36 @@ export function NewRecipeClient() {
                 {busy ? "取り込み中..." : "URLから取り込む"}
               </Button>
             </TabsContent>
+
+            {/* レシピを探す (web search) */}
+            <TabsContent value="ai" className="mt-4 space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">どんなレシピを探す?</label>
+                <Textarea
+                  rows={3}
+                  value={aiQuery}
+                  onChange={(e) => setAiQuery(e.target.value)}
+                  placeholder="例: 鶏胸肉を使った meal prep / ベトナム風朝食 / 高タンパク 簡単レシピ"
+                  disabled={busy}
+                />
+                <p className="text-xs text-muted-foreground">
+                  日本語のレシピサイトから 5 件提案します
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={fetchRecommendations}
+                disabled={busy}
+                className="w-full gap-1.5"
+              >
+                {busy ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+                {busy ? "検索中..." : "5件探す"}
+              </Button>
+            </TabsContent>
           </Tabs>
         )}
 
@@ -350,75 +320,87 @@ export function NewRecipeClient() {
         {step === "recommendations" && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              気になるレシピで「作ってみる」を押すと取り込めます
+              カードをタップで元サイトを開く。気に入ったら「作ってみる」で取り込み
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {recommendations.map((r, i) => (
-                <Card key={i} className="overflow-hidden flex flex-col">
-                  <div className="aspect-video bg-muted overflow-hidden">
-                    {r.thumbnail ? (
-                      <img
-                        src={r.thumbnail}
-                        alt={r.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <UtensilsCrossed className="w-8 h-8 text-muted-foreground/40" />
-                      </div>
-                    )}
-                  </div>
-                  <CardContent className="p-3 space-y-2 flex-1 flex flex-col">
-                    <p className="font-semibold text-sm leading-snug line-clamp-2">
-                      {r.title}
-                    </p>
-                    {r.summary && (
-                      <p className="text-xs text-muted-foreground line-clamp-3">
-                        {r.summary}
-                      </p>
-                    )}
-                    <div className="text-[10px] text-muted-foreground truncate">
-                      {(() => {
-                        try {
-                          return new URL(r.url).hostname;
-                        } catch {
-                          return r.url;
-                        }
-                      })()}
-                    </div>
-                    <div className="flex gap-1.5 mt-auto pt-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        asChild
-                        className="flex-1 gap-1.5"
-                      >
-                        <a
-                          href={r.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          元サイト
-                        </a>
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => importFromUrl(r.url)}
-                        disabled={busy}
-                        className="flex-1 gap-1.5"
-                      >
-                        {busy && pendingUrl === r.url && (
-                          <RefreshCw className="w-3 h-3 animate-spin" />
+              {recommendations.map((r, i) => {
+                const host = (() => {
+                  try {
+                    return new URL(r.url).hostname;
+                  } catch {
+                    return r.url;
+                  }
+                })();
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => window.open(r.url, "_blank", "noopener")}
+                    className="text-left group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg"
+                  >
+                    <Card className="overflow-hidden flex flex-col h-full transition-shadow group-hover:shadow-md">
+                      <div className="relative aspect-video bg-muted overflow-hidden">
+                        {r.thumbnail ? (
+                          <img
+                            src={r.thumbnail}
+                            alt={r.title}
+                            className="w-full h-full object-cover transition-transform group-hover:scale-[1.04]"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <UtensilsCrossed className="w-8 h-8 text-muted-foreground/40" />
+                          </div>
                         )}
-                        作ってみる
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                        <div className="absolute top-2 right-2 inline-flex items-center gap-1 bg-black/60 backdrop-blur text-white text-[10px] px-2 py-0.5 rounded-full">
+                          <ExternalLink className="w-2.5 h-2.5" />
+                          {host}
+                        </div>
+                      </div>
+                      <CardContent className="p-3 space-y-2 flex-1 flex flex-col">
+                        <p className="font-semibold text-sm leading-snug line-clamp-2">
+                          {r.title}
+                        </p>
+                        {r.features.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {r.features.map((f, fi) => (
+                              <Badge
+                                key={fi}
+                                variant="secondary"
+                                className="text-[10px] font-normal"
+                              >
+                                {f}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        {r.summary && (
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {r.summary}
+                          </p>
+                        )}
+                        <div className="mt-auto pt-1">
+                          <Button
+                            size="sm"
+                            disabled={busy}
+                            className="w-full gap-1.5"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              importFromUrl(r.url);
+                            }}
+                          >
+                            {importingUrl === r.url && (
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                            )}
+                            作ってみる
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </button>
+                );
+              })}
             </div>
             {recommendations.length === 0 && (
               <Card>
