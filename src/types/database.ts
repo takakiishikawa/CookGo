@@ -30,7 +30,6 @@ export interface Recipe {
   servings: number;
   prep_time_min: number | null;
   is_meal_prep_friendly: boolean;
-  is_tried: boolean;
   meal_prep_days: number | null;
   image_url: string | null;
   source_url: string | null;

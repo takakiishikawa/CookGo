@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -321,15 +320,6 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
 
       <div className="px-4 md:px-8 pt-5 pb-8 space-y-6 max-w-4xl">
         <div className="flex flex-wrap items-center gap-2">
-          {recipe.source_tag && (
-            <Badge variant="outline">
-              {recipe.source_tag === "self"
-                ? "自作"
-                : recipe.source_tag === "ai_suggest"
-                  ? "AI提案"
-                  : "宅配"}
-            </Badge>
-          )}
           {recipe.source_url && (
             <a
               href={recipe.source_url}

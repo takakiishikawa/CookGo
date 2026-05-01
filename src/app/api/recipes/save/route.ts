@@ -88,7 +88,6 @@ async function buildPayload(
     ingredients,
     steps,
     ai_generated: source_tag === "ai_suggest",
-    is_tried: false,
     image_url: imageUrl,
     source_tag,
     source_url: draft.source_url ?? null,

@@ -37,7 +37,6 @@ export async function POST(
       ingredients: src.ingredients,
       steps: src.steps,
       ai_generated: src.ai_generated ?? false,
-      is_tried: false,
       image_url: src.image_url,
       source_tag: src.source_tag ?? "self",
     };
