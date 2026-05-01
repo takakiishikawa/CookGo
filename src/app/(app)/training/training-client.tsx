@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { format, subDays } from "date-fns";
-import { ja } from "date-fns/locale";
+import { subDays } from "date-fns";
 import { Plus } from "lucide-react";
 import {
   Card,
@@ -14,6 +13,7 @@ import {
 } from "@takaki/go-design-system";
 import { AppHeader } from "@/components/layout/app-header";
 import { MetricChart } from "@/components/body/metric-chart";
+import { DeltaBadge } from "@/components/body/delta-badge";
 import { ExerciseRecordDialog } from "@/components/training/exercise-record-dialog";
 import { EXERCISE_META, isPullUp } from "@/lib/exercise-meta";
 import type {
@@ -35,8 +35,7 @@ export function TrainingClient({ exercises, personalRecords }: Props) {
     return exercises.map((ex) => {
       const pullUp = isPullUp(ex.name);
       const meta =
-        EXERCISE_META[ex.name as ExerciseName] ??
-        EXERCISE_META.half_deadlift;
+        EXERCISE_META[ex.name as ExerciseName] ?? EXERCISE_META.half_deadlift;
 
       const exerciseRecords = personalRecords.filter(
         (r) => r.exercise_id === ex.id,
@@ -81,7 +80,7 @@ export function TrainingClient({ exercises, personalRecords }: Props) {
     <div className="flex flex-col">
       <AppHeader />
 
-      <div className="px-4 md:px-8 pt-5 pb-8 space-y-6 max-w-5xl">
+      <div className="px-4 md:px-8 pt-5 pb-8 space-y-5 max-w-5xl">
         <PageHeader
           title="トレーニング"
           description="ベンチプレス・ハーフデッド・懸垂の自己ベストを記録"
@@ -93,7 +92,7 @@ export function TrainingClient({ exercises, personalRecords }: Props) {
               const Icon = meta.icon;
               return (
                 <Card key={exercise.id}>
-                  <CardContent className="p-4 space-y-2">
+                  <CardContent className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Icon
@@ -113,15 +112,17 @@ export function TrainingClient({ exercises, personalRecords }: Props) {
                         <Plus className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    <div>
-                      <div className="text-2xl font-bold">
-                        {currentVal !== null ? `${currentVal}${unit}` : "未記録"}
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold tabular-nums">
+                        {currentVal !== null
+                          ? `${currentVal}${unit}`
+                          : "未記録"}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {oldVal !== null
-                          ? `1ヶ月前: ${oldVal}${unit}`
-                          : "比較データなし"}
-                      </p>
+                      <DeltaBadge
+                        current={currentVal}
+                        previous={oldVal}
+                        unit={unit}
+                      />
                     </div>
                   </CardContent>
                 </Card>
@@ -143,13 +144,8 @@ export function TrainingClient({ exercises, personalRecords }: Props) {
                     color: meta.color,
                   },
                 }}
-                xKey="date"
                 yKey="value"
                 yUnit={pullUp ? "回" : "kg"}
-                xTickFormatter={(v) => format(new Date(v), "M/d")}
-                tooltipLabelFormatter={(v) =>
-                  format(new Date(v), "M月d日", { locale: ja })
-                }
               />
             ) : (
               <Section

@@ -111,6 +111,7 @@ export function ExerciseRecordDialog({
       }
 
       resetAddForm();
+      onOpenChange(false);
       router.refresh();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "記録に失敗しました");

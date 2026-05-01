@@ -202,12 +202,11 @@ export function CookGoSidebar() {
                 <SidebarMenuItem key={href}>
                   <SidebarMenuButton
                     asChild
-                    size="sm"
                     isActive={isActive(href, pathname)}
                   >
                     <Link href={href}>
-                      <Icon className="h-3.5 w-3.5 shrink-0" />
-                      <span className="text-xs">{label}</span>
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {label}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

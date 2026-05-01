@@ -10,31 +10,56 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@takaki/go-design-system";
-import { useId } from "react";
+import { useId, useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { format } from "date-fns";
 
 interface MetricChartProps {
   title: string;
-  data: Record<string, unknown>[];
+  /** date(string ISO) と yKey の値が入った配列 */
+  data: Array<Record<string, unknown> & { date: string }>;
   config: ChartConfig;
-  xKey: string;
   yKey: string;
   yUnit?: string;
-  xTickFormatter?: (value: string) => string;
   tooltipLabelFormatter?: (value: string) => string;
 }
+
+const TICK_COUNT = 6;
 
 export function MetricChart({
   title,
   data,
   config,
-  xKey,
   yKey,
   yUnit,
-  xTickFormatter,
   tooltipLabelFormatter,
 }: MetricChartProps) {
   const uid = useId().replace(/:/g, "");
+
+  // recharts は数値軸の方が等間隔ティックを綺麗に出せる。
+  // date(ISO) → epoch ms に正規化したフィールドを追加。
+  const { points, domain, ticks } = useMemo(() => {
+    const sorted = [...data]
+      .map((d) => ({ ...d, _ts: new Date(d.date).getTime() }))
+      .sort((a, b) => a._ts - b._ts);
+    if (sorted.length === 0) {
+      return { points: [], domain: [0, 0] as [number, number], ticks: [] };
+    }
+    const firstTs = sorted[0]._ts;
+    const lastTs = Date.now();
+    const start = firstTs;
+    const end = Math.max(lastTs, sorted[sorted.length - 1]._ts);
+    const span = Math.max(end - start, 86_400_000); // 最低 1日
+    const tickCount = Math.min(TICK_COUNT, Math.max(2, sorted.length));
+    const tickArr = Array.from({ length: tickCount }, (_, i) =>
+      Math.round(start + (span * i) / (tickCount - 1)),
+    );
+    return {
+      points: sorted,
+      domain: [start, end] as [number, number],
+      ticks: tickArr,
+    };
+  }, [data]);
 
   return (
     <Card className="@container/card">
@@ -47,7 +72,7 @@ export function MetricChart({
           className="aspect-auto h-[250px] w-full"
         >
           <AreaChart
-            data={data}
+            data={points}
             margin={{ top: 8, right: 12, left: 4, bottom: 0 }}
           >
             <defs>
@@ -72,12 +97,15 @@ export function MetricChart({
             </defs>
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey={xKey}
+              type="number"
+              dataKey="_ts"
+              domain={domain}
+              ticks={ticks}
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              minTickGap={32}
-              tickFormatter={xTickFormatter}
+              tickFormatter={(v) => format(new Date(v as number), "M/d")}
+              scale="time"
             />
             <YAxis
               tickLine={false}
@@ -91,13 +119,14 @@ export function MetricChart({
               cursor={false}
               content={
                 <ChartTooltipContent
-                  labelFormatter={
-                    tooltipLabelFormatter
-                      ? (v) => tooltipLabelFormatter(v as string)
-                      : xTickFormatter
-                        ? (v) => xTickFormatter(v as string)
-                        : undefined
-                  }
+                  labelFormatter={(v) => {
+                    const ts = Number(v);
+                    if (!Number.isFinite(ts)) return String(v);
+                    const iso = new Date(ts).toISOString();
+                    return tooltipLabelFormatter
+                      ? tooltipLabelFormatter(iso)
+                      : format(new Date(ts), "M月d日");
+                  }}
                   indicator="dot"
                 />
               }
@@ -107,6 +136,7 @@ export function MetricChart({
               type="natural"
               fill={`url(#${uid}-fill-${yKey})`}
               stroke={`var(--color-${yKey})`}
+              connectNulls
             />
           </AreaChart>
         </ChartContainer>

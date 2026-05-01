@@ -2,9 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { format, subDays } from "date-fns";
-import { ja } from "date-fns/locale";
-import { Plus, Scale, Trash2 } from "lucide-react";
+import { subDays } from "date-fns";
+import { Plus, Scale } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -22,6 +21,7 @@ import {
 } from "@takaki/go-design-system";
 import { AppHeader } from "@/components/layout/app-header";
 import { MetricChart } from "@/components/body/metric-chart";
+import { DeltaBadge } from "@/components/body/delta-badge";
 import { createClient } from "@/lib/supabase/client";
 import { todayStr, toLocalIso } from "@/lib/date-utils";
 import { DB_SCHEMA } from "@/lib/constants";
@@ -106,28 +106,11 @@ export function BodyClient({ bodyRecords, userId }: Props) {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("この記録を削除しますか？")) return;
-    const { error } = await supabase
-      .schema(DB_SCHEMA)
-      .from("body_records")
-      .delete()
-      .eq("id", id);
-    if (error) {
-      toast.error("削除に失敗しました");
-      return;
-    }
-    toast.success("削除しました");
-    router.refresh();
-  };
-
-  const recentRecords = [...bodyRecords].reverse().slice(0, 10);
-
   return (
     <div className="flex flex-col">
       <AppHeader />
 
-      <div className="px-4 md:px-8 pt-5 pb-8 space-y-6 max-w-5xl">
+      <div className="px-4 md:px-8 pt-5 pb-8 space-y-5 max-w-5xl">
         <PageHeader
           title="ボディ"
           actions={
@@ -157,39 +140,43 @@ export function BodyClient({ bodyRecords, userId }: Props) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {latestWeight?.weight_kg != null && (
                 <Card>
-                  <CardContent className="p-4 space-y-1">
+                  <CardContent className="p-4 space-y-3">
                     <div className="flex items-center gap-2">
                       <Scale className="w-4 h-4 text-muted-foreground" />
                       <span className="text-sm text-muted-foreground">体重</span>
                     </div>
-                    <div className="text-2xl font-bold">
-                      {latestWeight.weight_kg}kg
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold tabular-nums">
+                        {latestWeight.weight_kg}kg
+                      </div>
+                      <DeltaBadge
+                        current={latestWeight.weight_kg}
+                        previous={oldWeight?.weight_kg ?? null}
+                        unit="kg"
+                      />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {oldWeight?.weight_kg != null
-                        ? `1ヶ月前: ${oldWeight.weight_kg}kg`
-                        : "比較データなし"}
-                    </p>
                   </CardContent>
                 </Card>
               )}
               {latestFat?.body_fat_pct != null && (
                 <Card>
-                  <CardContent className="p-4 space-y-1">
+                  <CardContent className="p-4 space-y-3">
                     <div className="flex items-center gap-2">
                       <Scale className="w-4 h-4 text-muted-foreground" />
                       <span className="text-sm text-muted-foreground">
                         体脂肪率
                       </span>
                     </div>
-                    <div className="text-2xl font-bold">
-                      {latestFat.body_fat_pct}%
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold tabular-nums">
+                        {latestFat.body_fat_pct}%
+                      </div>
+                      <DeltaBadge
+                        current={latestFat.body_fat_pct}
+                        previous={oldFat?.body_fat_pct ?? null}
+                        unit="%"
+                      />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {oldFat?.body_fat_pct != null
-                        ? `1ヶ月前: ${oldFat.body_fat_pct}%`
-                        : "比較データなし"}
-                    </p>
                   </CardContent>
                 </Card>
               )}
@@ -206,14 +193,9 @@ export function BodyClient({ bodyRecords, userId }: Props) {
                         color: "#16A34A",
                       },
                     }}
-                    xKey="date"
                     yKey="weight"
                     yUnit="kg"
                     title="体重推移"
-                    xTickFormatter={(v) => format(new Date(v), "M/d")}
-                    tooltipLabelFormatter={(v) =>
-                      format(new Date(v), "M月d日", { locale: ja })
-                    }
                   />
                 )}
               {chartData.some((d) => d.bodyFat != null) &&
@@ -226,63 +208,12 @@ export function BodyClient({ bodyRecords, userId }: Props) {
                         color: "#0EA5E9",
                       },
                     }}
-                    xKey="date"
                     yKey="bodyFat"
                     yUnit="%"
                     title="体脂肪率推移"
-                    xTickFormatter={(v) => format(new Date(v), "M/d")}
-                    tooltipLabelFormatter={(v) =>
-                      format(new Date(v), "M月d日", { locale: ja })
-                    }
                   />
                 )}
             </div>
-
-            <Card>
-              <CardContent className="p-0 divide-y divide-border">
-                {recentRecords.map((r) => (
-                  <div
-                    key={r.id}
-                    className="flex items-center justify-between p-3"
-                  >
-                    <div className="flex items-baseline gap-3">
-                      <span className="text-xs text-muted-foreground tabular-nums">
-                        {format(new Date(r.recorded_at), "M/d(E)", {
-                          locale: ja,
-                        })}
-                      </span>
-                      <div className="flex gap-3 text-sm">
-                        {r.weight_kg != null && (
-                          <span>
-                            <span className="text-muted-foreground text-xs">
-                              体重{" "}
-                            </span>
-                            {r.weight_kg}kg
-                          </span>
-                        )}
-                        {r.body_fat_pct != null && (
-                          <span>
-                            <span className="text-muted-foreground text-xs">
-                              体脂肪{" "}
-                            </span>
-                            {r.body_fat_pct}%
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="w-7 h-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => handleDelete(r.id)}
-                      aria-label="削除"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
           </>
         )}
       </div>
