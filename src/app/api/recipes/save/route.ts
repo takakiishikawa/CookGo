@@ -126,12 +126,16 @@ export async function POST(request: Request) {
 
     const titleEn = await ensureTitleEn(draft);
     const enrichedDraft: DraftRecipe = { ...draft, title_en: titleEn };
-    const imageUrl = await fetchRecipeImage({
-      title: enrichedDraft.title,
-      title_en: enrichedDraft.title_en,
-      description: enrichedDraft.description,
-      ingredients: enrichedDraft.ingredients ?? [],
-    });
+    // ドラフトに既に image_url がある(URL取り込み時の og:image 等)場合はそれを採用、
+    // なければ Unsplash で生成
+    const imageUrl =
+      draft.image_url ??
+      (await fetchRecipeImage({
+        title: enrichedDraft.title,
+        title_en: enrichedDraft.title_en,
+        description: enrichedDraft.description,
+        ingredients: enrichedDraft.ingredients ?? [],
+      }));
 
     const payload = await buildPayload(enrichedDraft, imageUrl, source_tag);
 

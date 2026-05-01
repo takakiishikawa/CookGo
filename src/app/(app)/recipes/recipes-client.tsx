@@ -1,11 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Plus, UtensilsCrossed } from "lucide-react";
 import { Button, EmptyState } from "@takaki/go-design-system";
 import { AppHeader } from "@/components/layout/app-header";
+import { AddRecipeDialog } from "@/components/recipe/add-recipe-dialog";
 import type { Recipe } from "@/types/database";
 
 function GalleryTile({
@@ -54,7 +55,7 @@ interface RecipesClientProps {
 }
 
 export function RecipesClient({ recipes }: RecipesClientProps) {
-  const router = useRouter();
+  const [addOpen, setAddOpen] = useState(false);
 
   return (
     <div className="flex flex-col">
@@ -67,7 +68,7 @@ export function RecipesClient({ recipes }: RecipesClientProps) {
           </h1>
           <Button
             size="icon"
-            onClick={() => router.push("/recipes/new")}
+            onClick={() => setAddOpen(true)}
             aria-label="レシピを追加"
           >
             <Plus className="w-4 h-4" />
@@ -92,6 +93,8 @@ export function RecipesClient({ recipes }: RecipesClientProps) {
           </div>
         )}
       </div>
+
+      <AddRecipeDialog open={addOpen} onOpenChange={setAddOpen} />
     </div>
   );
 }

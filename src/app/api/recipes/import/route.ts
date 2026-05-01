@@ -121,6 +121,8 @@ ${SCHEMA_SAMPLE}`;
       ...draft,
       source_url: sourceUrl,
       source_tag: "ai_suggest",
+      // og:image が取れていれば save 時の Unsplash 取得をスキップさせる
+      image_url: thumbnail ?? null,
     };
 
     return NextResponse.json({

@@ -8,11 +8,8 @@ import {
   Minus,
   Plus,
   RefreshCw,
-  ShoppingCart,
-  X,
 } from "lucide-react";
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -23,6 +20,11 @@ import { AppHeader } from "@/components/layout/app-header";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { DB_SCHEMA } from "@/lib/constants";
+import { scaleAmountText } from "@/lib/amount-utils";
+import {
+  groupIngredients,
+  type GroupedIngredients,
+} from "@/lib/ingredient-categories";
 import type {
   Recipe,
   RecipeIngredient,
@@ -33,40 +35,6 @@ interface ShoppingClientProps {
   recipe: Recipe;
   initialItems: RecipeShoppingStateItem[];
   initialServings: number;
-}
-
-const SCALABLE_UNITS = new Set([
-  "g",
-  "kg",
-  "ml",
-  "l",
-  "個",
-  "本",
-  "枚",
-  "片",
-  "切れ",
-  "尾",
-  "玉",
-  "房",
-  "袋",
-  "缶",
-  "丁",
-  "杯",
-]);
-
-function formatAmount(amount: number): string {
-  const rounded = Math.round(amount * 10) / 10;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
-}
-
-function scaleAmount(ing: RecipeIngredient, ratio: number): string {
-  const unit = (ing.unit ?? "").trim();
-  const raw = (ing.amount ?? "").trim();
-  const numeric = Number(raw);
-  if (Number.isFinite(numeric) && numeric > 0 && SCALABLE_UNITS.has(unit)) {
-    return `${formatAmount(numeric * ratio)}${unit}`;
-  }
-  return unit ? `${raw}${unit}` : raw;
 }
 
 export function ShoppingClient({
@@ -82,34 +50,36 @@ export function ShoppingClient({
   const [servings, setServings] = useState<number>(initialServings);
   const ratio = useMemo(() => servings / baseServings, [servings, baseServings]);
 
-  // index ごとの状態を Map で管理 (default: is_needed=true, is_purchased=false)
-  const [itemState, setItemState] = useState<
-    Record<number, { is_needed: boolean; is_purchased: boolean }>
-  >(() => {
-    const initial: Record<number, { is_needed: boolean; is_purchased: boolean }> =
-      {};
+  // index ごとの「チェック済(=持ってる or 買った)」状態
+  const [checkedMap, setCheckedMap] = useState<Record<number, boolean>>(() => {
+    const initial: Record<number, boolean> = {};
     ingredients.forEach((_, i) => {
       const found = initialItems.find((s) => s.index === i);
-      initial[i] = {
-        is_needed: found?.is_needed ?? true,
-        is_purchased: found?.is_purchased ?? false,
-      };
+      // 旧スキーマ互換: is_purchased もしくは !is_needed をチェック扱いに
+      initial[i] = found
+        ? found.is_purchased || found.is_needed === false
+        : false;
     });
     return initial;
   });
 
-  // デバウンス保存
+  const groups = useMemo<GroupedIngredients[]>(
+    () => groupIngredients(ingredients),
+    [ingredients],
+  );
+
   const saveTimer = useRef<NodeJS.Timeout | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const persistState = async (next: typeof itemState) => {
+  const persistState = async (next: typeof checkedMap) => {
     setSaving(true);
     try {
       const items: RecipeShoppingStateItem[] = Object.entries(next).map(
-        ([idx, v]) => ({
+        ([idx, checked]) => ({
           index: Number(idx),
-          is_needed: v.is_needed,
-          is_purchased: v.is_purchased,
+          // 互換: チェック済 = is_purchased: true (is_needed は常に true で残す)
+          is_needed: true,
+          is_purchased: checked,
         }),
       );
       const {
@@ -137,39 +107,29 @@ export function ShoppingClient({
 
   useEffect(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => persistState(itemState), 600);
+    saveTimer.current = setTimeout(() => persistState(checkedMap), 600);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemState]);
+  }, [checkedMap]);
 
-  const toggleNeeded = (i: number) => {
-    setItemState((prev) => ({
-      ...prev,
-      [i]: {
-        ...prev[i],
-        is_needed: !prev[i]?.is_needed,
-        // 買わないに切り替えた時は購入済みもリセット
-        is_purchased: !prev[i]?.is_needed ? false : prev[i].is_purchased,
-      },
-    }));
-  };
-
-  const togglePurchased = (i: number) => {
-    setItemState((prev) => ({
-      ...prev,
-      [i]: { ...prev[i], is_purchased: !prev[i]?.is_purchased },
-    }));
+  const toggleChecked = (i: number) => {
+    setCheckedMap((prev) => ({ ...prev, [i]: !prev[i] }));
   };
 
   const clearList = async () => {
-    if (!confirm("買い物リストの状態をリセットしますか？(全部「買う・未購入」に戻ります)")) return;
-    const reset: typeof itemState = {};
+    if (
+      !confirm(
+        "買い物リストの状態をリセットしますか?(全部「未チェック」に戻ります)",
+      )
+    )
+      return;
+    const reset: typeof checkedMap = {};
     ingredients.forEach((_, i) => {
-      reset[i] = { is_needed: true, is_purchased: false };
+      reset[i] = false;
     });
-    setItemState(reset);
+    setCheckedMap(reset);
     try {
       await supabase
         .schema(DB_SCHEMA)
@@ -182,10 +142,8 @@ export function ShoppingClient({
     }
   };
 
-  const neededCount = Object.values(itemState).filter((v) => v.is_needed).length;
-  const purchasedCount = Object.values(itemState).filter(
-    (v) => v.is_needed && v.is_purchased,
-  ).length;
+  const totalCount = ingredients.length;
+  const checkedCount = Object.values(checkedMap).filter(Boolean).length;
 
   return (
     <div className="flex flex-col">
@@ -200,147 +158,132 @@ export function ShoppingClient({
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <PageHeader
-            title="買い物リスト"
-            description={recipe.title}
-          />
+          <PageHeader title="買い物リスト" description={recipe.title} />
         </div>
 
-        {/* 人数 + サマリ */}
+        {/* 人数 + サマリ + マイクロコピー */}
         <Card>
-          <CardContent className="p-3 flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground">人数</span>
-              <Button
-                size="icon"
-                variant="outline"
-                className="h-7 w-7"
-                onClick={() => setServings((s) => Math.max(1, s - 1))}
-                aria-label="人数を減らす"
-              >
-                <Minus className="w-3 h-3" />
-              </Button>
-              <span className="text-sm font-semibold tabular-nums w-8 text-center">
-                {servings}
+          <CardContent className="p-3 space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">人数</span>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-7 w-7"
+                  onClick={() => setServings((s) => Math.max(1, s - 1))}
+                  aria-label="人数を減らす"
+                >
+                  <Minus className="w-3 h-3" />
+                </Button>
+                <span className="text-sm font-semibold tabular-nums w-8 text-center">
+                  {servings}
+                </span>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-7 w-7"
+                  onClick={() => setServings((s) => Math.min(20, s + 1))}
+                  aria-label="人数を増やす"
+                >
+                  <Plus className="w-3 h-3" />
+                </Button>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {checkedCount}/{totalCount} チェック済
               </span>
-              <Button
-                size="icon"
-                variant="outline"
-                className="h-7 w-7"
-                onClick={() => setServings((s) => Math.min(20, s + 1))}
-                aria-label="人数を増やす"
-              >
-                <Plus className="w-3 h-3" />
-              </Button>
+              {saving && (
+                <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                  保存中
+                </span>
+              )}
             </div>
-            <Badge variant="secondary" className="gap-1">
-              <ShoppingCart className="w-3 h-3" />
-              買う {neededCount}品
-            </Badge>
-            <Badge variant="outline" className="gap-1">
-              <Check className="w-3 h-3" />
-              購入済 {purchasedCount}/{neededCount}
-            </Badge>
-            {saving && (
-              <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
-                <RefreshCw className="w-3 h-3 animate-spin" />
-                保存中
-              </span>
-            )}
+            <p className="text-xs text-muted-foreground">
+              すでに家にある or 買ったらタップしてチェック。チェックは自動で保存されます。
+            </p>
           </CardContent>
         </Card>
 
-        {/* 食材リスト */}
-        {ingredients.length === 0 ? (
+        {/* 食材リスト (グループ別) */}
+        {totalCount === 0 ? (
           <Card>
             <CardContent className="p-6 text-sm text-muted-foreground text-center">
               食材情報がありません
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-1.5">
-            {ingredients.map((ing, i) => {
-              const state = itemState[i] ?? { is_needed: true, is_purchased: false };
-              const amountText = scaleAmount(ing, ratio);
-              return (
-                <div
-                  key={i}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2.5 rounded-md border transition-colors",
-                    !state.is_needed
-                      ? "bg-muted/30 border-border/50 opacity-50"
-                      : state.is_purchased
-                        ? "bg-primary/5 border-primary/30"
-                        : "bg-card border-border",
-                  )}
-                >
-                  {/* 買った チェック */}
-                  <button
-                    type="button"
-                    onClick={() => togglePurchased(i)}
-                    disabled={!state.is_needed}
-                    className={cn(
-                      "w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0",
-                      state.is_purchased
-                        ? "bg-primary border-primary text-primary-foreground"
-                        : "border-muted-foreground/40 hover:border-primary",
-                      !state.is_needed && "opacity-40 cursor-not-allowed",
-                    )}
-                    aria-label={state.is_purchased ? "購入済を取り消す" : "購入済にする"}
-                  >
-                    {state.is_purchased && <Check className="w-3.5 h-3.5" />}
-                  </button>
-
-                  {/* 食材名 + 3言語 */}
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className={cn(
-                        "text-sm font-medium truncate",
-                        state.is_purchased && "line-through text-muted-foreground",
-                      )}
-                    >
-                      {ing.name}
-                    </p>
-                    {(ing.name_en || ing.name_vi) && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        {[ing.name_en, ing.name_vi].filter(Boolean).join(" / ")}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* 量 */}
-                  <span
-                    className={cn(
-                      "text-sm tabular-nums shrink-0",
-                      state.is_purchased && "line-through text-muted-foreground",
-                    )}
-                  >
-                    {amountText}
+          <div className="space-y-5">
+            {groups.map((group) => (
+              <div key={group.group} className="space-y-2">
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {group.label}
                   </span>
-
-                  {/* 買う / 買わない トグル */}
-                  <button
-                    type="button"
-                    onClick={() => toggleNeeded(i)}
-                    className={cn(
-                      "ml-1 p-1.5 rounded-md transition-colors flex-shrink-0",
-                      state.is_needed
-                        ? "text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                        : "text-muted-foreground hover:text-primary hover:bg-primary/10",
-                    )}
-                    aria-label={state.is_needed ? "買わないにする" : "買うに戻す"}
-                    title={state.is_needed ? "買わない" : "買う"}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <span className="text-xs text-muted-foreground">
+                    {group.items.length}品
+                  </span>
                 </div>
-              );
-            })}
+                <div className="space-y-1.5">
+                  {group.items.map(({ index, ingredient: ing }) => {
+                    const checked = !!checkedMap[index];
+                    const amountText = scaleAmountText(
+                      ing.amount,
+                      ing.unit,
+                      ratio,
+                    );
+                    return (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => toggleChecked(index)}
+                        className={cn(
+                          "w-full text-left flex items-center gap-3 px-3 py-3 rounded-md border transition-colors",
+                          checked
+                            ? "bg-primary/5 border-primary/30"
+                            : "bg-card border-border hover:bg-muted",
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors",
+                            checked
+                              ? "bg-primary border-primary text-primary-foreground"
+                              : "border-muted-foreground/30",
+                          )}
+                          aria-hidden
+                        >
+                          {checked && <Check className="w-3.5 h-3.5" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className={cn(
+                              "text-sm font-medium truncate",
+                              checked && "line-through text-muted-foreground",
+                            )}
+                          >
+                            {ing.name}
+                          </p>
+                        </div>
+                        <span
+                          className={cn(
+                            "text-sm tabular-nums shrink-0",
+                            checked && "line-through text-muted-foreground",
+                          )}
+                        >
+                          {amountText}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
         {/* リストクリアボタン */}
-        {ingredients.length > 0 && (
+        {totalCount > 0 && (
           <div className="flex gap-2 pt-2">
             <Button
               variant="outline"

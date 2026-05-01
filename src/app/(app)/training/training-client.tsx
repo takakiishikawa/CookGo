@@ -81,10 +81,7 @@ export function TrainingClient({ exercises, personalRecords }: Props) {
       <AppHeader />
 
       <div className="px-4 md:px-8 pt-5 pb-8 space-y-5 max-w-5xl">
-        <PageHeader
-          title="トレーニング"
-          description="ベンチプレス・ハーフデッド・懸垂の自己ベストを記録"
-        />
+        <PageHeader title="トレーニング" />
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {exerciseData.map(

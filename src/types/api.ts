@@ -19,6 +19,8 @@ export interface DraftRecipe {
   steps: RecipeStep[];
   source_tag?: RecipeSourceTag | null;
   source_url?: string | null;
+  /** 既に画像 URL が確定している場合(URL取り込み時の og:image 等)に渡すと、save 時の Unsplash フォールバックをスキップ */
+  image_url?: string | null;
 }
 
 // POST /api/recipes/save (create new from draft)
