@@ -1,6 +1,6 @@
 "use client";
 
-import { Leaf } from "lucide-react";
+import { ChefHat } from "lucide-react";
 import { LoginPage } from "@takaki/go-design-system";
 import { createClient } from "@/lib/supabase/client";
 
@@ -19,7 +19,7 @@ export default function LoginRoute() {
   return (
     <LoginPage
       productName="CookGo"
-      productLogo={<Leaf className="h-7 w-7" />}
+      productLogo={<ChefHat className="h-7 w-7" />}
       tagline="料理を楽しむためのレシピ管理アプリ。"
       onGoogleSignIn={handleGoogleSignIn}
     />
