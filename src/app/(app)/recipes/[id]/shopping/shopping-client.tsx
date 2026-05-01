@@ -2,21 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Check,
-  Minus,
-  Plus,
-  RefreshCw,
-} from "lucide-react";
+import { Check, Minus, Plus, RefreshCw } from "lucide-react";
 import {
   Button,
   Card,
   CardContent,
   PageHeader,
+  Progress,
   toast,
 } from "@takaki/go-design-system";
 import { AppHeader } from "@/components/layout/app-header";
+import { IngredientThumb } from "@/components/recipe/ingredient-thumb";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { DB_SCHEMA } from "@/lib/constants";
@@ -50,12 +46,10 @@ export function ShoppingClient({
   const [servings, setServings] = useState<number>(initialServings);
   const ratio = useMemo(() => servings / baseServings, [servings, baseServings]);
 
-  // index ごとの「チェック済(=持ってる or 買った)」状態
   const [checkedMap, setCheckedMap] = useState<Record<number, boolean>>(() => {
     const initial: Record<number, boolean> = {};
     ingredients.forEach((_, i) => {
       const found = initialItems.find((s) => s.index === i);
-      // 旧スキーマ互換: is_purchased もしくは !is_needed をチェック扱いに
       initial[i] = found
         ? found.is_purchased || found.is_needed === false
         : false;
@@ -77,7 +71,6 @@ export function ShoppingClient({
       const items: RecipeShoppingStateItem[] = Object.entries(next).map(
         ([idx, checked]) => ({
           index: Number(idx),
-          // 互換: チェック済 = is_purchased: true (is_needed は常に true で残す)
           is_needed: true,
           is_purchased: checked,
         }),
@@ -121,7 +114,7 @@ export function ShoppingClient({
   const clearList = async () => {
     if (
       !confirm(
-        "買い物リストの状態をリセットしますか?(全部「未チェック」に戻ります)",
+        "全部のチェックを外して、まっさらな状態に戻しますか?",
       )
     )
       return;
@@ -136,7 +129,7 @@ export function ShoppingClient({
         .from("recipe_shopping_state")
         .delete()
         .eq("recipe_id", recipe.id);
-      toast.success("リストをリセットしました");
+      toast.success("チェックをリセットしました");
     } catch {
       toast.error("リセットに失敗しました");
     }
@@ -144,68 +137,89 @@ export function ShoppingClient({
 
   const totalCount = ingredients.length;
   const checkedCount = Object.values(checkedMap).filter(Boolean).length;
+  const progressPct =
+    totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0;
 
   return (
     <div className="flex flex-col">
-      <AppHeader />
+      <AppHeader
+        breadcrumbs={[
+          { label: "レシピ", href: "/recipes" },
+          {
+            label: recipe.title,
+            href: `/recipes/${recipe.id}`,
+          },
+          { label: "買い物リスト" },
+        ]}
+      />
 
-      <div className="px-4 md:px-8 pt-5 pb-24 space-y-5 max-w-3xl">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push(`/recipes/${recipe.id}`)}
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <PageHeader title="買い物リスト" description={recipe.title} />
-        </div>
+      <div className="px-4 md:px-8 pt-5 pb-24 space-y-5 max-w-4xl">
+        <PageHeader
+          title="買い物リスト"
+          description={recipe.title}
+          actions={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearList}
+              className="gap-1.5"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              リセット
+            </Button>
+          }
+        />
 
-        {/* 人数 + サマリ + マイクロコピー */}
+        {/* 進捗 + 人数 */}
         <Card>
-          <CardContent className="p-3 space-y-2">
-            <div className="flex flex-wrap items-center gap-3">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-end justify-between gap-3 flex-wrap">
+              <div>
+                <p className="text-xs text-muted-foreground">チェック済</p>
+                <p className="text-2xl md:text-3xl font-bold tabular-nums">
+                  {checkedCount}
+                  <span className="text-base font-normal text-muted-foreground">
+                    {" / "}
+                    {totalCount}
+                  </span>
+                </p>
+              </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground">人数</span>
                 <Button
                   size="icon"
                   variant="outline"
-                  className="h-7 w-7"
+                  className="h-8 w-8"
                   onClick={() => setServings((s) => Math.max(1, s - 1))}
                   aria-label="人数を減らす"
                 >
-                  <Minus className="w-3 h-3" />
+                  <Minus className="w-3.5 h-3.5" />
                 </Button>
-                <span className="text-sm font-semibold tabular-nums w-8 text-center">
+                <span className="text-base font-semibold tabular-nums w-8 text-center">
                   {servings}
                 </span>
                 <Button
                   size="icon"
                   variant="outline"
-                  className="h-7 w-7"
+                  className="h-8 w-8"
                   onClick={() => setServings((s) => Math.min(20, s + 1))}
                   aria-label="人数を増やす"
                 >
-                  <Plus className="w-3 h-3" />
+                  <Plus className="w-3.5 h-3.5" />
                 </Button>
+                {saving && (
+                  <RefreshCw className="ml-2 w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                )}
               </div>
-              <span className="text-xs text-muted-foreground">
-                {checkedCount}/{totalCount} チェック済
-              </span>
-              {saving && (
-                <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
-                  <RefreshCw className="w-3 h-3 animate-spin" />
-                  保存中
-                </span>
-              )}
             </div>
+            <Progress value={progressPct} />
             <p className="text-xs text-muted-foreground">
-              すでに家にある or 買ったらタップしてチェック。チェックは自動で保存されます。
+              タップでチェック。家にあるものも、買ったものも、これ一つで管理できます。
             </p>
           </CardContent>
         </Card>
 
-        {/* 食材リスト (グループ別) */}
+        {/* 食材リスト (グループ別 + PC 2列) */}
         {totalCount === 0 ? (
           <Card>
             <CardContent className="p-6 text-sm text-muted-foreground text-center">
@@ -213,18 +227,16 @@ export function ShoppingClient({
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-6">
             {groups.map((group) => (
               <div key={group.group} className="space-y-2">
                 <div className="flex items-center gap-2 px-1">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    {group.label}
-                  </span>
+                  <span className="text-sm font-semibold">{group.label}</span>
                   <span className="text-xs text-muted-foreground">
                     {group.items.length}品
                   </span>
                 </div>
-                <div className="space-y-1.5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {group.items.map(({ index, ingredient: ing }) => {
                     const checked = !!checkedMap[index];
                     const amountText = scaleAmountText(
@@ -238,12 +250,33 @@ export function ShoppingClient({
                         type="button"
                         onClick={() => toggleChecked(index)}
                         className={cn(
-                          "w-full text-left flex items-center gap-3 px-3 py-3 rounded-md border transition-colors",
+                          "w-full text-left flex items-center gap-3 px-3 py-3 rounded-lg border transition-colors",
                           checked
-                            ? "bg-primary/5 border-primary/30"
+                            ? "bg-primary/5 border-primary/40"
                             : "bg-card border-border hover:bg-muted",
                         )}
                       >
+                        <IngredientThumb ingredient={ing} size="md" />
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className={cn(
+                              "text-sm font-medium truncate",
+                              checked && "line-through text-muted-foreground",
+                            )}
+                          >
+                            {ing.name}
+                          </p>
+                          <p
+                            className={cn(
+                              "text-xs tabular-nums",
+                              checked
+                                ? "line-through text-muted-foreground"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            {amountText}
+                          </p>
+                        </div>
                         <div
                           className={cn(
                             "w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors",
@@ -255,45 +288,12 @@ export function ShoppingClient({
                         >
                           {checked && <Check className="w-3.5 h-3.5" />}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p
-                            className={cn(
-                              "text-sm font-medium truncate",
-                              checked && "line-through text-muted-foreground",
-                            )}
-                          >
-                            {ing.name}
-                          </p>
-                        </div>
-                        <span
-                          className={cn(
-                            "text-sm tabular-nums shrink-0",
-                            checked && "line-through text-muted-foreground",
-                          )}
-                        >
-                          {amountText}
-                        </span>
                       </button>
                     );
                   })}
                 </div>
               </div>
             ))}
-          </div>
-        )}
-
-        {/* リストクリアボタン */}
-        {totalCount > 0 && (
-          <div className="flex gap-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={clearList}
-              className="gap-1.5"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              リストをクリア
-            </Button>
           </div>
         )}
       </div>

@@ -2,11 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    // gallery / 詳細で使う外部画像ドメインを許可
-    remotePatterns: [
-      { protocol: "https", hostname: "images.unsplash.com" },
-      { protocol: "https", hostname: "*.supabase.co" },
-    ],
+    // 任意のレシピサイトの og:image を許可するため wildcard。
+    // 個人ユース前提。次の3パターンを受ける:
+    //   - Unsplash: images.unsplash.com
+    //   - Supabase Storage: *.supabase.co
+    //   - 外部レシピサイトの og:image: 任意の https ホスト
+    remotePatterns: [{ protocol: "https", hostname: "**" }],
     // Vercel が WebP/AVIF を自動配信
     formats: ["image/avif", "image/webp"],
   },
