@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Camera,
+  ExternalLink,
   Pencil,
   RefreshCw,
   ShoppingCart,
@@ -15,11 +16,33 @@ import {
 } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import { Button, Separator, toast } from "@takaki/go-design-system";
-import { Recipe, RecipeStep } from "@/types/database";
+import { Recipe, RecipeIngredient, RecipeStep } from "@/types/database";
+import { IngredientThumb } from "@/components/recipe/ingredient-thumb";
 import { StepImage } from "@/components/recipe/step-image";
 import { createClient } from "@/lib/supabase/client";
 import { DB_SCHEMA } from "@/lib/constants";
 import { groupStepsIntoPhases } from "@/lib/step-phases";
+
+/** ステップ本文中で言及されている食材を抽出 */
+function findStepIngredients(
+  text: string,
+  ingredients: RecipeIngredient[],
+): RecipeIngredient[] {
+  if (!text) return [];
+  // 名前が長い順に試して、より具体的なマッチを優先
+  const sorted = [...ingredients].sort((a, b) => b.name.length - a.name.length);
+  const seen = new Set<string>();
+  const matched: RecipeIngredient[] = [];
+  for (const ing of sorted) {
+    if (!ing.name || ing.name.length < 1) continue;
+    if (seen.has(ing.name)) continue;
+    if (text.includes(ing.name)) {
+      matched.push(ing);
+      seen.add(ing.name);
+    }
+  }
+  return matched;
+}
 
 interface RecipeDetailClientProps {
   recipe: Recipe;
@@ -44,6 +67,11 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
   const stepPhases = useMemo(
     () => groupStepsIntoPhases(stepsState),
     [stepsState],
+  );
+
+  const ingredientsList = useMemo<RecipeIngredient[]>(
+    () => (recipe.ingredients as RecipeIngredient[] | null) ?? [],
+    [recipe.ingredients],
   );
 
   const youtubeSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(recipe.title + " 作り方")}`;
@@ -153,7 +181,7 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
       />
 
       <div className="px-4 md:px-8 pt-6 pb-12 space-y-6 max-w-3xl">
-        {/* ===== ヘッダー (画像 左 + タイトル/説明 右) ===== */}
+        {/* ===== ヘッダー: 画像 + タイトル + 右側プライマリアクション ===== */}
         <div className="flex gap-4 items-start">
           <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-lg overflow-hidden flex-shrink-0 bg-muted">
             {imageUrl ? (
@@ -208,10 +236,53 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
               </p>
             )}
           </div>
+          {/* プライマリアクションを右側に縦積み (sm+) */}
+          <div className="hidden sm:flex flex-col gap-1.5 flex-shrink-0">
+            <Button
+              onClick={openShoppingList}
+              className="gap-1.5 justify-start"
+              size="sm"
+            >
+              <ShoppingCart className="w-4 h-4" />
+              買い物
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="gap-1.5 justify-start"
+            >
+              <a
+                href={youtubeSearchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Video className="w-3.5 h-3.5 text-destructive" />
+                YouTube
+              </a>
+            </Button>
+            {recipe.source_url && (
+              <Button
+                variant="outline"
+                size="sm"
+                asChild
+                className="gap-1.5 justify-start"
+              >
+                <a
+                  href={recipe.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  元レシピ
+                </a>
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* ===== アクション行 ===== */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* モバイル用プライマリアクション (横並び) */}
+        <div className="flex sm:hidden flex-wrap items-center gap-2">
           <Button onClick={openShoppingList} className="gap-1.5" size="sm">
             <ShoppingCart className="w-4 h-4" />
             買い物
@@ -226,28 +297,44 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
               YouTube
             </a>
           </Button>
-          <div className="ml-auto flex gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              asChild
-              aria-label="編集"
-              title="編集"
-            >
-              <Link href={`/recipes/${recipe.id}/edit`}>
-                <Pencil className="w-4 h-4" />
-              </Link>
+          {recipe.source_url && (
+            <Button variant="outline" size="sm" asChild className="gap-1.5">
+              <a
+                href={recipe.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                元レシピ
+              </a>
             </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={deleteRecipe}
-              aria-label="削除"
-              title="削除"
-            >
-              <Trash2 className="w-4 h-4 text-destructive" />
-            </Button>
-          </div>
+          )}
+        </div>
+
+        {/* セカンダリアクション (編集・削除): 控えめに右下寄せ */}
+        <div className="flex justify-end gap-1 -mt-2">
+          <Button
+            size="icon"
+            variant="ghost"
+            asChild
+            aria-label="編集"
+            title="編集"
+            className="w-7 h-7 text-muted-foreground"
+          >
+            <Link href={`/recipes/${recipe.id}/edit`}>
+              <Pencil className="w-3.5 h-3.5" />
+            </Link>
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={deleteRecipe}
+            aria-label="削除"
+            title="削除"
+            className="w-7 h-7 text-muted-foreground hover:text-destructive"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
         </div>
 
         <Separator />
@@ -280,6 +367,10 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
                     const absIndex = stepsState.findIndex(
                       (s) => s.order === step.order,
                     );
+                    const stepIngredients = findStepIngredients(
+                      step.text,
+                      ingredientsList,
+                    );
                     return (
                       <li key={step.order} className="flex gap-3">
                         <span className="flex-shrink-0 w-7 h-7 rounded-full bg-primary/10 text-primary text-sm font-bold flex items-center justify-center mt-0.5 tabular-nums">
@@ -289,14 +380,47 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
                           <p className="text-base leading-relaxed">
                             {step.text}
                           </p>
-                          {step.image_query && (
-                            <StepImage
-                              query={step.image_query}
-                              onRegenerate={() =>
-                                regenerateOneStepImage(absIndex)
-                              }
-                              regenerating={regeneratingStep === absIndex}
-                            />
+                          {(step.image_query ||
+                            stepIngredients.length > 0) && (
+                            <div className="flex flex-col sm:flex-row gap-3">
+                              {step.image_query && (
+                                <div className="sm:flex-1 min-w-0">
+                                  <StepImage
+                                    query={step.image_query}
+                                    onRegenerate={() =>
+                                      regenerateOneStepImage(absIndex)
+                                    }
+                                    regenerating={regeneratingStep === absIndex}
+                                  />
+                                </div>
+                              )}
+                              {stepIngredients.length > 0 && (
+                                <div
+                                  className={
+                                    step.image_query
+                                      ? "grid grid-cols-4 sm:grid-cols-2 gap-2 sm:w-32 sm:flex-shrink-0 content-start"
+                                      : "grid grid-cols-4 sm:grid-cols-6 gap-2"
+                                  }
+                                >
+                                  {stepIngredients
+                                    .slice(0, 8)
+                                    .map((ing, idx) => (
+                                      <div
+                                        key={`${ing.name}-${idx}`}
+                                        className="flex flex-col items-center gap-0.5"
+                                      >
+                                        <IngredientThumb
+                                          ingredient={ing}
+                                          size="sm"
+                                        />
+                                        <span className="text-[10px] text-muted-foreground line-clamp-1 text-center w-full">
+                                          {ing.name}
+                                        </span>
+                                      </div>
+                                    ))}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       </li>

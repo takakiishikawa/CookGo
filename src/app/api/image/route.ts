@@ -29,10 +29,18 @@ export async function GET(request: Request) {
   if (!query)
     return NextResponse.json({ imageUrl: null } satisfies ImageResponse);
 
+  const seedRaw = searchParams.get("seed");
+  const seed = seedRaw ? Math.max(1, Math.min(10, Number(seedRaw) || 1)) : 1;
+  const useCache = seed === 1;
+
   const now = Date.now();
-  const cached = CACHE[query];
-  if (cached && cached.expires > now) {
-    return NextResponse.json({ imageUrl: cached.url } satisfies ImageResponse);
+  if (useCache) {
+    const cached = CACHE[query];
+    if (cached && cached.expires > now) {
+      return NextResponse.json({
+        imageUrl: cached.url,
+      } satisfies ImageResponse);
+    }
   }
 
   // Try multiple Unsplash variants for better food/ingredient hits
@@ -48,17 +56,17 @@ export async function GET(request: Request) {
   }
 
   for (const v of variants) {
-    const url = await fetchUnsplashImage(v);
+    const url = await fetchUnsplashImage(v, seed);
     if (url) {
-      CACHE[query] = { url, expires: now + TTL_MS };
+      if (useCache) CACHE[query] = { url, expires: now + TTL_MS };
       return NextResponse.json({ imageUrl: url } satisfies ImageResponse);
     }
   }
 
-  // Wikipedia fallback
+  // Wikipedia fallback (seed の影響なし)
   const wiki = await fetchWikipediaImage(query);
   if (wiki) {
-    CACHE[query] = { url: wiki, expires: now + TTL_MS };
+    if (useCache) CACHE[query] = { url: wiki, expires: now + TTL_MS };
     return NextResponse.json({ imageUrl: wiki } satisfies ImageResponse);
   }
 

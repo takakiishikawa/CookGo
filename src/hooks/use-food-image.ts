@@ -8,7 +8,10 @@ interface UseFoodImageResult {
   error: boolean;
 }
 
-export function useFoodImage(query: string | null): UseFoodImageResult {
+export function useFoodImage(
+  query: string | null,
+  seed = 1,
+): UseFoodImageResult {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(!!query);
   const [error, setError] = useState(false);
@@ -24,7 +27,11 @@ export function useFoodImage(query: string | null): UseFoodImageResult {
     setLoading(true);
     setError(false);
     setImageUrl(null);
-    fetch(`/api/image?query=${encodeURIComponent(query)}`)
+    const url =
+      seed > 1
+        ? `/api/image?query=${encodeURIComponent(query)}&seed=${seed}`
+        : `/api/image?query=${encodeURIComponent(query)}`;
+    fetch(url)
       .then((r) => r.json())
       .then((d: { imageUrl: string | null }) => {
         if (!cancelled) {
@@ -41,7 +48,7 @@ export function useFoodImage(query: string | null): UseFoodImageResult {
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [query, seed]);
 
   return { imageUrl, loading, error };
 }

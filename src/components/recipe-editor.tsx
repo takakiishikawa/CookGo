@@ -20,6 +20,7 @@ import {
   Textarea,
   toast,
 } from "@takaki/go-design-system";
+import { AddIngredientDialog } from "@/components/recipe/add-ingredient-dialog";
 import { IngredientThumb } from "@/components/recipe/ingredient-thumb";
 import { StepImage } from "@/components/recipe/step-image";
 import { groupIngredients } from "@/lib/ingredient-categories";
@@ -74,6 +75,7 @@ export function RecipeEditor({
     initial.steps.map((s) => ({ ...s, _uid: nextUid() })),
   );
   const [regeneratingStep, setRegeneratingStep] = useState<number | null>(null);
+  const [addIngOpen, setAddIngOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const setField = <K extends keyof DraftRecipe>(
@@ -89,19 +91,8 @@ export function RecipeEditor({
     );
   };
 
-  const addIngredient = () => {
-    setIngredients((prev) => [
-      ...prev,
-      {
-        _uid: nextUid(),
-        name: "",
-        name_en: null,
-        name_vi: null,
-        amount: "",
-        unit: "",
-        category: "other",
-      },
-    ]);
+  const addIngredientFromDialog = (ing: RecipeIngredient) => {
+    setIngredients((prev) => [...prev, { ...ing, _uid: nextUid() }]);
   };
 
   const removeIngredient = (uid: string) => {
@@ -279,7 +270,7 @@ export function RecipeEditor({
       <Section
         title="食材"
         actions={
-          <Button size="sm" variant="outline" onClick={addIngredient}>
+          <Button size="sm" variant="outline" onClick={() => setAddIngOpen(true)}>
             <Plus className="w-3.5 h-3.5 mr-1" />
             追加
           </Button>
@@ -300,12 +291,12 @@ export function RecipeEditor({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {group.items.map(({ uid, ingredient: ing }) => (
                     <Card key={uid} className="border-border">
-                      <CardContent className="p-2.5">
+                      <CardContent className="p-3">
                         <div className="flex items-center gap-3">
                           <IngredientThumb
                             ingredient={ing}
-                            size="lg"
-                            className="rounded-md"
+                            size="xl"
+                            regenerable
                           />
                           <div className="flex-1 min-w-0 space-y-1.5">
                             <Input
@@ -410,6 +401,12 @@ export function RecipeEditor({
           </div>
         )}
       </Section>
+
+      <AddIngredientDialog
+        open={addIngOpen}
+        onOpenChange={setAddIngOpen}
+        onSubmit={addIngredientFromDialog}
+      />
 
       {/* ===== アクション (右寄せ通常幅) ===== */}
       <div className="flex items-center justify-end gap-2 pt-2">
