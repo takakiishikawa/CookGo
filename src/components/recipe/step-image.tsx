@@ -5,20 +5,29 @@ import { Skeleton } from "@takaki/go-design-system";
 import { useFoodImage } from "@/hooks/use-food-image";
 
 interface StepImageProps {
+  /** Unsplash 検索用クエリ (英語推奨)。directUrl が無いときに使用 */
   query: string | null;
+  /** 元 URL のページから抽出した直接画像 URL。設定されていれば最優先で表示 */
+  directUrl?: string | null;
   onRegenerate?: () => void;
   regenerating?: boolean;
 }
 
 export function StepImage({
   query,
+  directUrl,
   onRegenerate,
   regenerating,
 }: StepImageProps) {
-  const { imageUrl, loading } = useFoodImage(query);
+  const useDirect = !!directUrl?.trim();
+  const { imageUrl: fetchedUrl, loading } = useFoodImage(
+    useDirect ? null : query,
+  );
+  const imageUrl = useDirect ? directUrl! : fetchedUrl;
+
   return (
     <div className="relative">
-      {loading ? (
+      {!useDirect && loading ? (
         <Skeleton className="w-full aspect-video rounded-md" />
       ) : imageUrl ? (
         <img
@@ -33,7 +42,7 @@ export function StepImage({
           <UtensilsCrossed className="w-6 h-6 text-muted-foreground/40" />
         </div>
       )}
-      {onRegenerate && (
+      {onRegenerate && !useDirect && (
         <button
           type="button"
           onClick={onRegenerate}

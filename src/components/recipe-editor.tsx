@@ -387,6 +387,7 @@ export function RecipeEditor({
                     />
                     <StepImage
                       query={step.image_query}
+                      directUrl={step.image_url ?? null}
                       onRegenerate={
                         canRegenerate
                           ? () => regenerateStepImage(step._uid)

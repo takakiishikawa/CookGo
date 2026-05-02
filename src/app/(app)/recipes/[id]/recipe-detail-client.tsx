@@ -15,7 +15,7 @@ import {
   Video,
 } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
-import { Button, Separator, toast } from "@takaki/go-design-system";
+import { Badge, Button, Separator, toast } from "@takaki/go-design-system";
 import { Recipe, RecipeIngredient, RecipeStep } from "@/types/database";
 import { StepImage } from "@/components/recipe/step-image";
 import { createClient } from "@/lib/supabase/client";
@@ -250,6 +250,19 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
             <h1 className="text-2xl md:text-3xl font-semibold leading-tight">
               {recipe.title}
             </h1>
+            {recipe.tags && recipe.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {recipe.tags.map((t, i) => (
+                  <Badge
+                    key={`${t}-${i}`}
+                    variant="secondary"
+                    className="text-[10px] font-normal"
+                  >
+                    {t}
+                  </Badge>
+                ))}
+              </div>
+            )}
             {recipe.description && (
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {recipe.description}
@@ -434,9 +447,10 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
                               ))}
                             </div>
                           )}
-                          {step.image_query && (
+                          {(step.image_url || step.image_query) && (
                             <StepImage
                               query={step.image_query}
+                              directUrl={step.image_url ?? null}
                               onRegenerate={() =>
                                 regenerateOneStepImage(absIndex)
                               }

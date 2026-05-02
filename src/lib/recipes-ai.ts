@@ -12,6 +12,7 @@ export const SCHEMA_SAMPLE = `{
   "description": "1〜2文の説明",
   "prep_time_min": 20,
   "servings": 1,
+  "tags": ["定番和食", "フライパン1つ", "ご飯泥棒"],
   "ingredients": [
     {
       "name": "豚ロース",
@@ -39,7 +40,8 @@ export const FIXED_CONSTRAINTS = `【固定条件（最優先・必ず守る）�
 - 食材は具体的に種目まで（例：「肉」ではなく「豚バラ肉」「鶏もも肉」など）
 - ingredients[*].unit は数値量のときは "g" / "ml" など。"大さじ2" のように amount に単位が含まれる場合は空文字 ""
 - name_en / name_vi はサーバー側で後から自動付与するため出力不要（出力しても無視される）
-- steps[*].image_query は 各調理過程の写真検索用に英語で具体的に書く（必須・各ステップ毎に）`;
+- steps[*].image_query は 各調理過程の写真検索用に英語で具体的に書く（必須・各ステップ毎に）
+- tags は短い特徴タグ 2〜4 個 (各 8 文字以内程度) で、調理時間 / 主材料 / 調理法 / シーン / 特殊技法 等から拾う。「美味しい」「簡単」など曖昧で全レシピに当てはまる語は禁止。例: ["30分以内", "作り置き向き", "鶏胸肉メイン"], ["低温調理", "BONIQ公式", "本格派"]`;
 
 export interface RawDraft {
   title?: unknown;
@@ -51,6 +53,7 @@ export interface RawDraft {
   servings?: unknown;
   ingredients?: unknown;
   steps?: unknown;
+  tags?: unknown;
 }
 
 function asString(v: unknown): string | null {
@@ -87,7 +90,20 @@ function normalizeStep(raw: unknown): RecipeStep | null {
     order: asNumber(r.order) ?? 0,
     text,
     image_query: asString(r.image_query),
+    image_url: asString(r.image_url),
   };
+}
+
+function normalizeTags(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const v of raw) {
+    if (typeof v !== "string") continue;
+    const t = v.trim();
+    if (t.length > 0) out.push(t);
+    if (out.length >= 6) break;
+  }
+  return out;
 }
 
 export function normalizeDraft(raw: RawDraft): DraftRecipe | null {
@@ -111,6 +127,7 @@ export function normalizeDraft(raw: RawDraft): DraftRecipe | null {
     servings: asNumber(raw.servings) ?? 1,
     ingredients,
     steps,
+    tags: normalizeTags(raw.tags),
   };
 }
 

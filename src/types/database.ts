@@ -11,6 +11,8 @@ export interface RecipeStep {
   order: number;
   text: string;
   image_query: string | null;
+  /** 元 URL のページから抽出した直接画像 URL。設定があれば image_query より優先 */
+  image_url?: string | null;
 }
 
 export type RecipeSourceTag = "self" | "ai_suggest" | "delivery";
@@ -37,6 +39,8 @@ export interface Recipe {
   steps: RecipeStep[] | null;
   ai_generated: boolean;
   source_tag: RecipeSourceTag | null;
+  /** 短い特徴タグ (例: ["BONIQ公式", "湯せん低温調理"])。recipes テーブルの tags 列 */
+  tags: string[] | null;
   created_at: string;
 }
 

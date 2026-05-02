@@ -8,16 +8,77 @@ export interface ExtractedHtml {
   title: string | null;
   ogImage: string | null;
   jsonLdRecipe: unknown | null;
+  /** JSON-LD の recipeInstructions[].image から抽出したステップ画像 URL の配列 (順序通り) */
+  stepImages: string[];
   bodyText: string;
 }
 
 export function extractFromHtml(html: string): ExtractedHtml {
+  const jsonLdRecipe = extractJsonLdRecipe(html);
   return {
     title: extractTitle(html),
     ogImage: extractOgImage(html),
-    jsonLdRecipe: extractJsonLdRecipe(html),
+    jsonLdRecipe,
+    stepImages: extractStepImagesFromJsonLd(jsonLdRecipe),
     bodyText: extractBodyText(html),
   };
+}
+
+/**
+ * JSON-LD Recipe.recipeInstructions から各ステップの image を取り出す。
+ * recipeInstructions は string / HowToStep / HowToSection (steps を内包) のいずれか。
+ */
+function extractStepImagesFromJsonLd(recipe: unknown): string[] {
+  if (!recipe || typeof recipe !== "object") return [];
+  const obj = recipe as Record<string, unknown>;
+  const instructions = obj.recipeInstructions;
+  if (!Array.isArray(instructions)) return [];
+  const out: string[] = [];
+  for (const item of instructions) {
+    if (!item || typeof item !== "object") {
+      out.push("");
+      continue;
+    }
+    const it = item as Record<string, unknown>;
+    const t = it["@type"];
+    if (
+      t === "HowToSection" ||
+      (Array.isArray(t) && t.includes("HowToSection"))
+    ) {
+      const inner = it.itemListElement;
+      if (Array.isArray(inner)) {
+        for (const s of inner) {
+          out.push(extractImageFromInstructionItem(s));
+        }
+      }
+    } else {
+      out.push(extractImageFromInstructionItem(item));
+    }
+  }
+  return out;
+}
+
+function extractImageFromInstructionItem(item: unknown): string {
+  if (!item || typeof item !== "object") return "";
+  const it = item as Record<string, unknown>;
+  const img = it.image;
+  if (typeof img === "string") return img;
+  if (Array.isArray(img)) {
+    const first = img.find(
+      (x): x is string | { url?: string } =>
+        typeof x === "string" || (typeof x === "object" && x !== null),
+    );
+    if (typeof first === "string") return first;
+    if (first && typeof first === "object" && "url" in first) {
+      const u = (first as { url?: unknown }).url;
+      return typeof u === "string" ? u : "";
+    }
+  }
+  if (img && typeof img === "object" && "url" in img) {
+    const u = (img as { url?: unknown }).url;
+    return typeof u === "string" ? u : "";
+  }
+  return "";
 }
 
 function extractTitle(html: string): string | null {

@@ -52,6 +52,7 @@ export async function POST(request: Request) {
     let extractedText = content;
     let sourceUrl: string | null = url || null;
     let thumbnail: string | null = null;
+    let stepImages: string[] = [];
 
     if (url && !content) {
       const html = await fetchHtml(url);
@@ -68,6 +69,7 @@ export async function POST(request: Request) {
       }
       const extracted = extractFromHtml(html);
       thumbnail = extracted.ogImage;
+      stepImages = extracted.stepImages;
 
       if (extracted.jsonLdRecipe) {
         // JSON-LD があれば最優先で渡す（Claude にも JSON 整形を任せる）
@@ -117,8 +119,15 @@ ${SCHEMA_SAMPLE}`;
       throw new Error("レシピを構造化できませんでした");
     }
 
+    // 元 URL のステップ画像を steps[i].image_url に紐付け (あれば)
+    const stepsWithImages = draft.steps.map((s, i) => ({
+      ...s,
+      image_url: stepImages[i]?.trim() || s.image_url || null,
+    }));
+
     const enrichedDraft: DraftRecipe = {
       ...draft,
+      steps: stepsWithImages,
       source_url: sourceUrl,
       source_tag: "ai_suggest",
       // og:image が取れていれば save 時の Unsplash 取得をスキップさせる

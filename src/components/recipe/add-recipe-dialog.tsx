@@ -49,11 +49,17 @@ type Step = "input" | "recommendations" | "paste" | "loading";
 const RECOMMEND_TIMEOUT_MS = 90_000;
 const IMPORT_TIMEOUT_MS = 90_000;
 
-const STAGE_MESSAGES = [
+const STAGE_MESSAGES_IMPORT = [
   "サイトを開いています…",
   "本文を読み取っています…",
   "AI が材料と手順を整えています…",
   "保存しています…",
+];
+
+const STAGE_MESSAGES_RECOMMEND = [
+  "AI でレシピを探しています…",
+  "良さそうな候補をまとめています…",
+  "サムネイル画像を取得しています…",
 ];
 
 export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
@@ -63,6 +69,9 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
   const [step, setStep] = useState<Step>("input");
   const [busy, setBusy] = useState(false);
   const [stageIndex, setStageIndex] = useState(0);
+  const [stageMessages, setStageMessages] = useState<string[]>(
+    STAGE_MESSAGES_IMPORT,
+  );
 
   const [urlInput, setUrlInput] = useState("");
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
@@ -91,11 +100,12 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
     }
   }, [open]);
 
-  const startStageMessages = () => {
+  const startStageMessages = (messages: string[]) => {
+    setStageMessages(messages);
     setStageIndex(0);
     if (stageTimerRef.current) clearInterval(stageTimerRef.current);
     stageTimerRef.current = setInterval(() => {
-      setStageIndex((i) => Math.min(STAGE_MESSAGES.length - 1, i + 1));
+      setStageIndex((i) => Math.min(messages.length - 1, i + 1));
     }, 7_000);
   };
   const stopStageMessages = () => {
@@ -117,6 +127,9 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
 
     setBusy(true);
     setRecommendations([]);
+    setStep("loading");
+    setPendingUrl(null);
+    startStageMessages(STAGE_MESSAGES_RECOMMEND);
     try {
       const res = await fetch("/api/recipes/recommend", {
         method: "POST",
@@ -142,8 +155,10 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
             ? err.message
             : "検索に失敗しました",
       );
+      setStep("input");
     } finally {
       clearTimeout(timeout);
+      stopStageMessages();
       setBusy(false);
     }
   };
@@ -163,7 +178,7 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
 
     setBusy(true);
     setStep("loading");
-    startStageMessages();
+    startStageMessages(STAGE_MESSAGES_IMPORT);
     setPendingUrl(body.url ?? body.sourceUrl ?? null);
 
     try {
@@ -187,7 +202,7 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
       if (importData.error) throw new Error(importData.error);
       const draft = importData.draft as DraftRecipe;
 
-      setStageIndex(STAGE_MESSAGES.length - 1);
+      setStageIndex(STAGE_MESSAGES_IMPORT.length - 1);
       const saveRes = await fetch("/api/recipes/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -202,7 +217,8 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
 
       toast.success(`「${draft.title}」を登録しました`);
       onOpenChange(false);
-      router.push(`/recipes/${saveData.recipe_id}`);
+      // 一覧に戻って新規追加されたレシピを確認しやすくする
+      router.push("/recipes");
       router.refresh();
     } catch (err) {
       const isAbort = err instanceof DOMException && err.name === "AbortError";
@@ -226,9 +242,11 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>レシピを追加</DialogTitle>
-          <DialogDescription>
-            URL を貼るか、AI に探してもらいましょう
-          </DialogDescription>
+          {step === "input" && (
+            <DialogDescription>
+              URL を貼るか、AI に探してもらいましょう
+            </DialogDescription>
+          )}
         </DialogHeader>
 
         {/* ===== input ===== */}
@@ -401,16 +419,13 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
           <div className="py-10 flex flex-col items-center gap-4">
             <RefreshCw className="w-8 h-8 text-primary animate-spin" />
             <div className="text-center space-y-1">
-              <p className="text-sm font-medium">{STAGE_MESSAGES[stageIndex]}</p>
+              <p className="text-sm font-medium">
+                {stageMessages[stageIndex]}
+              </p>
               <p className="text-xs text-muted-foreground">
                 完了までに 20〜40 秒ほどかかります
               </p>
             </div>
-            {pendingUrl && (
-              <p className="text-[10px] text-muted-foreground break-all max-w-md text-center">
-                {pendingUrl}
-              </p>
-            )}
           </div>
         )}
 
