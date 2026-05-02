@@ -63,7 +63,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full">
         {children}
-        <Toaster position="top-center" richColors />
+        <Toaster />
         <PwaRegister />
         <Analytics />
       </body>

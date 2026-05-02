@@ -8,7 +8,6 @@ import {
   Card,
   CardContent,
   PageHeader,
-  Progress,
   toast,
 } from "@takaki/go-design-system";
 import { AppHeader } from "@/components/layout/app-header";
@@ -136,9 +135,6 @@ export function ShoppingClient({
   };
 
   const totalCount = ingredients.length;
-  const checkedCount = Object.values(checkedMap).filter(Boolean).length;
-  const progressPct =
-    totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0;
 
   return (
     <div className="flex flex-col">
@@ -149,13 +145,13 @@ export function ShoppingClient({
             label: recipe.title,
             href: `/recipes/${recipe.id}`,
           },
-          { label: "買い物リスト" },
+          { label: "買い物" },
         ]}
       />
 
       <div className="px-4 md:px-8 pt-5 pb-24 space-y-5 max-w-4xl">
         <PageHeader
-          title="買い物リスト"
+          title="買い物"
           description={recipe.title}
           actions={
             <Button
@@ -170,54 +166,34 @@ export function ShoppingClient({
           }
         />
 
-        {/* 進捗 + 人数 */}
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-end justify-between gap-3 flex-wrap">
-              <div>
-                <p className="text-xs text-muted-foreground">チェック済</p>
-                <p className="text-2xl md:text-3xl font-bold tabular-nums">
-                  {checkedCount}
-                  <span className="text-base font-normal text-muted-foreground">
-                    {" / "}
-                    {totalCount}
-                  </span>
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">人数</span>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8"
-                  onClick={() => setServings((s) => Math.max(1, s - 1))}
-                  aria-label="人数を減らす"
-                >
-                  <Minus className="w-3.5 h-3.5" />
-                </Button>
-                <span className="text-base font-semibold tabular-nums w-8 text-center">
-                  {servings}
-                </span>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8"
-                  onClick={() => setServings((s) => Math.min(20, s + 1))}
-                  aria-label="人数を増やす"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </Button>
-                {saving && (
-                  <RefreshCw className="ml-2 w-3.5 h-3.5 animate-spin text-muted-foreground" />
-                )}
-              </div>
-            </div>
-            <Progress value={progressPct} />
-            <p className="text-xs text-muted-foreground">
-              タップでチェック。家にあるものも、買ったものも、これ一つで管理できます。
-            </p>
-          </CardContent>
-        </Card>
+        {/* 人数調整 */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm text-muted-foreground mr-1">人数</span>
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-8 w-8"
+            onClick={() => setServings((s) => Math.max(1, s - 1))}
+            aria-label="人数を減らす"
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </Button>
+          <span className="text-base font-semibold tabular-nums w-8 text-center">
+            {servings}
+          </span>
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-8 w-8"
+            onClick={() => setServings((s) => Math.min(20, s + 1))}
+            aria-label="人数を増やす"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </Button>
+          {saving && (
+            <RefreshCw className="ml-2 w-3.5 h-3.5 animate-spin text-muted-foreground" />
+          )}
+        </div>
 
         {/* 食材リスト (グループ別 + PC 2列) */}
         {totalCount === 0 ? (
@@ -266,6 +242,18 @@ export function ShoppingClient({
                           >
                             {ing.name}
                           </p>
+                          {(ing.name_en || ing.name_vi) && (
+                            <p
+                              className={cn(
+                                "text-[11px] truncate text-muted-foreground/80",
+                                checked && "line-through",
+                              )}
+                            >
+                              {[ing.name_en, ing.name_vi]
+                                .filter(Boolean)
+                                .join(" / ")}
+                            </p>
+                          )}
                           <p
                             className={cn(
                               "text-xs tabular-nums",

@@ -63,7 +63,7 @@ export function RecipesClient({ recipes }: RecipesClientProps) {
 
       <div className="px-4 md:px-8 pt-6 pb-12 space-y-6 max-w-6xl">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+          <h1 className="text-2xl font-semibold leading-tight">
             レシピ
           </h1>
           <Button

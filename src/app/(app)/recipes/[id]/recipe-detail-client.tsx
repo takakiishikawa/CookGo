@@ -1,29 +1,22 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Camera,
-  ExternalLink,
   Pencil,
   RefreshCw,
   ShoppingCart,
-  Sparkles,
   Trash2,
   UtensilsCrossed,
   Video,
 } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
-import {
-  Badge,
-  Button,
-  Separator,
-  Skeleton,
-  toast,
-} from "@takaki/go-design-system";
+import { Button, Separator, toast } from "@takaki/go-design-system";
 import { Recipe, RecipeStep } from "@/types/database";
-import { useFoodImage } from "@/hooks/use-food-image";
+import { StepImage } from "@/components/recipe/step-image";
 import { createClient } from "@/lib/supabase/client";
 import { DB_SCHEMA } from "@/lib/constants";
 import { groupStepsIntoPhases } from "@/lib/step-phases";
@@ -33,51 +26,6 @@ interface RecipeDetailClientProps {
 }
 
 const MAX_THUMBNAIL_SIZE_MB = 5;
-
-function StepImage({
-  query,
-  onRegenerate,
-  regenerating,
-}: {
-  query: string | null;
-  onRegenerate: () => void;
-  regenerating: boolean;
-}) {
-  const { imageUrl, loading } = useFoodImage(query);
-  return (
-    <div className="relative">
-      {loading ? (
-        <Skeleton className="w-full aspect-video rounded-md" />
-      ) : imageUrl ? (
-        <img
-          src={imageUrl}
-          alt={query ?? ""}
-          className="w-full aspect-video object-cover rounded-md"
-          loading="lazy"
-          decoding="async"
-        />
-      ) : (
-        <div className="w-full aspect-video rounded-md bg-surface-subtle flex items-center justify-center">
-          <UtensilsCrossed className="w-6 h-6 text-muted-foreground/40" />
-        </div>
-      )}
-      <button
-        type="button"
-        onClick={onRegenerate}
-        disabled={regenerating}
-        className="absolute top-2 right-2 inline-flex items-center justify-center w-8 h-8 rounded-full bg-black/55 backdrop-blur text-white hover:bg-black/75 transition-colors disabled:opacity-50"
-        aria-label="この画像を変える"
-        title="画像を別の候補に変える"
-      >
-        {regenerating ? (
-          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-        ) : (
-          <Sparkles className="w-3.5 h-3.5" />
-        )}
-      </button>
-    </div>
-  );
-}
 
 export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
   const router = useRouter();
@@ -99,15 +47,6 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
   );
 
   const youtubeSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(recipe.title + " 作り方")}`;
-
-  const sourceHostname = useMemo(() => {
-    if (!recipe.source_url) return null;
-    try {
-      return new URL(recipe.source_url).hostname.replace(/^www\./, "");
-    } catch {
-      return null;
-    }
-  }, [recipe.source_url]);
 
   const deleteRecipe = async () => {
     if (!confirm(`「${recipe.title}」を削除しますか?`)) return;
@@ -214,21 +153,22 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
       />
 
       <div className="px-4 md:px-8 pt-6 pb-12 space-y-6 max-w-3xl">
-        {/* ===== コンパクトヘッダー (画像 左 + タイトル/説明 右) ===== */}
+        {/* ===== ヘッダー (画像 左 + タイトル/説明 右) ===== */}
         <div className="flex gap-4 items-start">
-          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-lg overflow-hidden flex-shrink-0 bg-muted">
+          <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-lg overflow-hidden flex-shrink-0 bg-muted">
             {imageUrl ? (
-              <img
+              <Image
                 src={imageUrl}
                 alt={recipe.title}
-                className="w-full h-full object-cover"
-                loading="eager"
-                fetchPriority="high"
+                fill
+                sizes="(min-width: 640px) 160px, 128px"
+                priority
+                className="object-cover"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <UtensilsCrossed
-                  className="w-8 h-8 text-muted-foreground/40"
+                  className="w-10 h-10 text-muted-foreground/40"
                   strokeWidth={1.5}
                 />
               </div>
@@ -247,19 +187,19 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className="absolute bottom-1 right-1 inline-flex items-center justify-center w-7 h-7 rounded-full bg-black/60 backdrop-blur text-white hover:bg-black/80 transition-colors disabled:opacity-50"
+              className="absolute bottom-1.5 right-1.5 inline-flex items-center justify-center w-8 h-8 rounded-full bg-black/60 backdrop-blur text-white hover:bg-black/80 transition-colors disabled:opacity-50"
               aria-label="写真を変更"
               title="写真を変更"
             >
               {uploading ? (
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <RefreshCw className="w-4 h-4 animate-spin" />
               ) : (
-                <Camera className="w-3.5 h-3.5" />
+                <Camera className="w-4 h-4" />
               )}
             </button>
           </div>
-          <div className="flex-1 min-w-0 space-y-1.5">
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-snug">
+          <div className="flex-1 min-w-0 space-y-2">
+            <h1 className="text-2xl md:text-3xl font-semibold leading-tight">
               {recipe.title}
             </h1>
             {recipe.description && (
@@ -274,25 +214,8 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={openShoppingList} className="gap-1.5" size="sm">
             <ShoppingCart className="w-4 h-4" />
-            買い物リスト
+            買い物
           </Button>
-          {recipe.source_url && (
-            <Button variant="outline" size="sm" asChild className="gap-1.5">
-              <a
-                href={recipe.source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                元レシピ
-                {sourceHostname && (
-                  <Badge variant="secondary" className="ml-1 font-normal">
-                    {sourceHostname}
-                  </Badge>
-                )}
-              </a>
-            </Button>
-          )}
           <Button variant="outline" size="sm" asChild className="gap-1.5">
             <a
               href={youtubeSearchUrl}

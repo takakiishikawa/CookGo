@@ -1,20 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, RefreshCw, UtensilsCrossed } from "lucide-react";
 import {
   Button,
   PageHeader,
-  Card,
-  CardContent,
   toast,
 } from "@takaki/go-design-system";
 import { AppHeader } from "@/components/layout/app-header";
 import { RecipeEditor } from "@/components/recipe-editor";
+import { createClient } from "@/lib/supabase/client";
+import { DB_SCHEMA } from "@/lib/constants";
 import type { Recipe } from "@/types/database";
 import type { DraftRecipe } from "@/types/api";
+
+const MAX_THUMBNAIL_SIZE_MB = 5;
 
 function recipeToDraft(r: Recipe): DraftRecipe {
   return {
@@ -37,9 +37,13 @@ function recipeToDraft(r: Recipe): DraftRecipe {
 
 export function EditRecipeClient({ recipe }: { recipe: Recipe }) {
   const router = useRouter();
+  const supabase = createClient();
   const [saving, setSaving] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(recipe.image_url);
   const [regenerating, setRegenerating] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const cancel = () => router.push(`/recipes/${recipe.id}`);
 
   const regenerateImage = async () => {
     setRegenerating(true);
@@ -51,13 +55,61 @@ export function EditRecipeClient({ recipe }: { recipe: Recipe }) {
       if (data.error) throw new Error(data.error);
       setImageUrl(data.image_url ?? null);
       toast.success(
-        data.image_url ? "画像を再生成しました" : "画像を取得できませんでした",
+        data.image_url ? "画像を更新しました" : "画像を取得できませんでした",
       );
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "再生成に失敗しました");
+      toast.error(err instanceof Error ? err.message : "更新に失敗しました");
     } finally {
       setRegenerating(false);
+    }
+  };
+
+  const handlePickImageFile = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("画像ファイルを選択してください");
+      return;
+    }
+    if (file.size > MAX_THUMBNAIL_SIZE_MB * 1024 * 1024) {
+      toast.error(`${MAX_THUMBNAIL_SIZE_MB}MB以下の画像を選択してください`);
+      return;
+    }
+    setUploading(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("ログインが必要です");
+
+      const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase();
+      const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpg";
+      const path = `${user.id}/${recipe.id}-${Date.now()}.${safeExt}`;
+
+      const upload = await supabase.storage
+        .from("cookgo-recipes")
+        .upload(path, file, { contentType: file.type, upsert: false });
+      if (upload.error) throw upload.error;
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("cookgo-recipes").getPublicUrl(path);
+
+      const { error } = await supabase
+        .schema(DB_SCHEMA)
+        .from("recipes")
+        .update({ image_url: publicUrl })
+        .eq("id", recipe.id);
+      if (error) throw error;
+
+      setImageUrl(publicUrl);
+      toast.success("写真を変更しました");
+      router.refresh();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "アップロードに失敗しました",
+      );
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -86,66 +138,37 @@ export function EditRecipeClient({ recipe }: { recipe: Recipe }) {
 
   return (
     <div className="flex flex-col">
-      <AppHeader />
-      <div className="px-4 md:px-8 pt-5 pb-24 space-y-5 max-w-3xl">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push(`/recipes/${recipe.id}`)}
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <PageHeader title="レシピ編集" description={recipe.title} />
-        </div>
-
-        <Card>
-          <CardContent className="p-3 flex items-center gap-3">
-            {imageUrl ? (
-              <Image
-                src={imageUrl}
-                alt={recipe.title}
-                width={96}
-                height={64}
-                unoptimized
-                className="w-24 h-16 rounded-md object-cover bg-muted"
-              />
-            ) : (
-              <div className="w-24 h-16 rounded-md bg-surface-subtle flex items-center justify-center">
-                <UtensilsCrossed
-                  className="w-5 h-5 text-muted-foreground"
-                  strokeWidth={1.5}
-                />
-              </div>
-            )}
-            <div className="flex-1">
-              <p className="text-xs text-muted-foreground">レシピ画像</p>
-              <p className="text-sm">
-                {imageUrl ? "Unsplashから取得済み" : "未取得"}
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-              onClick={regenerateImage}
-              disabled={regenerating}
-            >
-              <RefreshCw
-                className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`}
-              />
-              {regenerating ? "取得中..." : "画像を再生成"}
+      <AppHeader
+        breadcrumbs={[
+          { label: "レシピ", href: "/recipes" },
+          { label: recipe.title, href: `/recipes/${recipe.id}` },
+          { label: "編集" },
+        ]}
+      />
+      <div className="px-4 md:px-8 pt-5 pb-12 space-y-5 max-w-3xl">
+        <PageHeader
+          title="レシピ編集"
+          description={recipe.title}
+          actions={
+            <Button variant="ghost" size="sm" onClick={cancel}>
+              レシピに戻る
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
 
         <RecipeEditor
           initial={recipeToDraft(recipe)}
           saving={saving}
           saveLabel="更新"
           onSave={save}
-          onCancel={() => router.push(`/recipes/${recipe.id}`)}
+          onCancel={cancel}
           cancelLabel="戻る"
+          recipeId={recipe.id}
+          imageUrl={imageUrl}
+          onPickImageFile={handlePickImageFile}
+          onRegenerateImage={regenerateImage}
+          uploading={uploading}
+          regeneratingImage={regenerating}
         />
       </div>
     </div>
