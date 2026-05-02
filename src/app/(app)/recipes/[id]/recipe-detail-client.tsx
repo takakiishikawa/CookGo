@@ -17,11 +17,25 @@ import {
 import { AppHeader } from "@/components/layout/app-header";
 import { Button, Separator, toast } from "@takaki/go-design-system";
 import { Recipe, RecipeIngredient, RecipeStep } from "@/types/database";
-import { IngredientThumb } from "@/components/recipe/ingredient-thumb";
 import { StepImage } from "@/components/recipe/step-image";
 import { createClient } from "@/lib/supabase/client";
 import { DB_SCHEMA } from "@/lib/constants";
 import { groupStepsIntoPhases } from "@/lib/step-phases";
+
+/** 「ジャガイモ（ラセット種）」→ ["ジャガイモ（ラセット種）", "ジャガイモ", "ラセット種"] */
+function getIngredientAliases(name: string): string[] {
+  const aliases = new Set<string>();
+  if (name) aliases.add(name);
+  const stripped = name.replace(/[（(].*?[)）]/g, "").trim();
+  if (stripped && stripped !== name && stripped.length >= 2) {
+    aliases.add(stripped);
+  }
+  for (const m of name.matchAll(/[（(](.*?)[)）]/g)) {
+    const inner = m[1].trim();
+    if (inner.length >= 2) aliases.add(inner);
+  }
+  return [...aliases];
+}
 
 /** ステップ本文中で言及されている食材を抽出 */
 function findStepIngredients(
@@ -29,14 +43,20 @@ function findStepIngredients(
   ingredients: RecipeIngredient[],
 ): RecipeIngredient[] {
   if (!text) return [];
-  // 名前が長い順に試して、より具体的なマッチを優先
-  const sorted = [...ingredients].sort((a, b) => b.name.length - a.name.length);
+  const withAliases = ingredients
+    .filter((ing) => ing.name)
+    .map((ing) => ({ ing, aliases: getIngredientAliases(ing.name) }));
+  // 最も長いエイリアスを使ってソート (より具体的なマッチを優先)
+  withAliases.sort((a, b) => {
+    const al = Math.max(...a.aliases.map((s) => s.length), 0);
+    const bl = Math.max(...b.aliases.map((s) => s.length), 0);
+    return bl - al;
+  });
   const seen = new Set<string>();
   const matched: RecipeIngredient[] = [];
-  for (const ing of sorted) {
-    if (!ing.name || ing.name.length < 1) continue;
+  for (const { ing, aliases } of withAliases) {
     if (seen.has(ing.name)) continue;
-    if (text.includes(ing.name)) {
+    if (aliases.some((a) => text.includes(a))) {
       matched.push(ing);
       seen.add(ing.name);
     }
@@ -383,19 +403,12 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
                           {stepIngredients.length > 0 && (
                             <div className="flex flex-wrap gap-1.5">
                               {stepIngredients.map((ing, idx) => (
-                                <div
+                                <span
                                   key={`${ing.name}-${idx}`}
-                                  className="inline-flex items-center gap-1.5 pl-0.5 pr-2.5 py-0.5 rounded-full bg-muted/60 border border-border"
+                                  className="inline-flex items-center px-2.5 py-1 rounded-full bg-muted/60 border border-border text-xs text-foreground/80"
                                 >
-                                  <IngredientThumb
-                                    ingredient={ing}
-                                    size="sm"
-                                    className="w-6 h-6 rounded-full"
-                                  />
-                                  <span className="text-xs text-foreground/80 whitespace-nowrap">
-                                    {ing.name}
-                                  </span>
-                                </div>
+                                  {ing.name}
+                                </span>
                               ))}
                             </div>
                           )}

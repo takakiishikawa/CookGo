@@ -135,6 +135,11 @@ export function ShoppingClient({
   };
 
   const totalCount = ingredients.length;
+  const checkedCount = useMemo(
+    () => Object.values(checkedMap).filter(Boolean).length,
+    [checkedMap],
+  );
+  const allDone = totalCount > 0 && checkedCount === totalCount;
 
   return (
     <div className="flex flex-col">
@@ -166,33 +171,53 @@ export function ShoppingClient({
           }
         />
 
-        {/* 人数調整 */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm text-muted-foreground mr-1">人数</span>
-          <Button
-            size="icon"
-            variant="outline"
-            className="h-8 w-8"
-            onClick={() => setServings((s) => Math.max(1, s - 1))}
-            aria-label="人数を減らす"
-          >
-            <Minus className="w-3.5 h-3.5" />
-          </Button>
-          <span className="text-base font-semibold tabular-nums w-8 text-center">
-            {servings}
-          </span>
-          <Button
-            size="icon"
-            variant="outline"
-            className="h-8 w-8"
-            onClick={() => setServings((s) => Math.min(20, s + 1))}
-            aria-label="人数を増やす"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </Button>
-          {saving && (
-            <RefreshCw className="ml-2 w-3.5 h-3.5 animate-spin text-muted-foreground" />
-          )}
+        {/* 進捗 + 人数 */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm tabular-nums">
+            {allDone ? (
+              <span className="inline-flex items-center gap-1.5 text-primary font-medium">
+                <Check className="w-4 h-4" />
+                全部買えました
+              </span>
+            ) : totalCount > 0 ? (
+              <span>
+                <span className="font-semibold text-foreground">
+                  {checkedCount}
+                </span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  / {totalCount} 購入済み
+                </span>
+              </span>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm text-muted-foreground mr-1">人数</span>
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => setServings((s) => Math.max(1, s - 1))}
+              aria-label="人数を減らす"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </Button>
+            <span className="text-base font-semibold tabular-nums w-8 text-center">
+              {servings}
+            </span>
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => setServings((s) => Math.min(20, s + 1))}
+              aria-label="人数を増やす"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </Button>
+            {saving && (
+              <RefreshCw className="ml-2 w-3.5 h-3.5 animate-spin text-muted-foreground" />
+            )}
+          </div>
         </div>
 
         {/* 食材リスト (グループ別 + PC 2列) */}
@@ -233,37 +258,48 @@ export function ShoppingClient({
                         )}
                       >
                         <IngredientThumb ingredient={ing} size="md" />
-                        <div className="flex-1 min-w-0">
-                          <p
-                            className={cn(
-                              "text-sm font-medium truncate",
-                              checked && "line-through text-muted-foreground",
-                            )}
-                          >
-                            {ing.name}
-                          </p>
-                          {(ing.name_en || ing.name_vi) && (
+                        <div className="flex-1 min-w-0 space-y-0.5">
+                          <div className="flex items-baseline gap-2">
+                            <p
+                              className={cn(
+                                "text-sm font-medium truncate flex-1",
+                                checked &&
+                                  "line-through text-muted-foreground",
+                              )}
+                            >
+                              {ing.name}
+                            </p>
+                            <p
+                              className={cn(
+                                "text-xs tabular-nums whitespace-nowrap flex-shrink-0",
+                                checked
+                                  ? "line-through text-muted-foreground"
+                                  : "text-muted-foreground",
+                              )}
+                            >
+                              {amountText}
+                            </p>
+                          </div>
+                          {ing.name_en && (
                             <p
                               className={cn(
                                 "text-[11px] truncate text-muted-foreground/80",
                                 checked && "line-through",
                               )}
                             >
-                              {[ing.name_en, ing.name_vi]
-                                .filter(Boolean)
-                                .join(" / ")}
+                              {ing.name_en}
                             </p>
                           )}
-                          <p
-                            className={cn(
-                              "text-xs tabular-nums",
-                              checked
-                                ? "line-through text-muted-foreground"
-                                : "text-muted-foreground",
-                            )}
-                          >
-                            {amountText}
-                          </p>
+                          {ing.name_vi && (
+                            <p
+                              className={cn(
+                                "text-[11px] truncate text-muted-foreground/70",
+                                checked && "line-through",
+                              )}
+                            >
+                              {ing.name_vi}
+                            </p>
+                          )}
                         </div>
                         <div
                           className={cn(
