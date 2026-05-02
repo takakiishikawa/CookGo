@@ -380,47 +380,33 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
                           <p className="text-base leading-relaxed">
                             {step.text}
                           </p>
-                          {(step.image_query ||
-                            stepIngredients.length > 0) && (
-                            <div className="flex flex-col sm:flex-row gap-3">
-                              {step.image_query && (
-                                <div className="sm:flex-1 min-w-0">
-                                  <StepImage
-                                    query={step.image_query}
-                                    onRegenerate={() =>
-                                      regenerateOneStepImage(absIndex)
-                                    }
-                                    regenerating={regeneratingStep === absIndex}
-                                  />
-                                </div>
-                              )}
-                              {stepIngredients.length > 0 && (
+                          {stepIngredients.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {stepIngredients.map((ing, idx) => (
                                 <div
-                                  className={
-                                    step.image_query
-                                      ? "grid grid-cols-4 sm:grid-cols-2 gap-2 sm:w-32 sm:flex-shrink-0 content-start"
-                                      : "grid grid-cols-4 sm:grid-cols-6 gap-2"
-                                  }
+                                  key={`${ing.name}-${idx}`}
+                                  className="inline-flex items-center gap-1.5 pl-0.5 pr-2.5 py-0.5 rounded-full bg-muted/60 border border-border"
                                 >
-                                  {stepIngredients
-                                    .slice(0, 8)
-                                    .map((ing, idx) => (
-                                      <div
-                                        key={`${ing.name}-${idx}`}
-                                        className="flex flex-col items-center gap-0.5"
-                                      >
-                                        <IngredientThumb
-                                          ingredient={ing}
-                                          size="sm"
-                                        />
-                                        <span className="text-[10px] text-muted-foreground line-clamp-1 text-center w-full">
-                                          {ing.name}
-                                        </span>
-                                      </div>
-                                    ))}
+                                  <IngredientThumb
+                                    ingredient={ing}
+                                    size="sm"
+                                    className="w-6 h-6 rounded-full"
+                                  />
+                                  <span className="text-xs text-foreground/80 whitespace-nowrap">
+                                    {ing.name}
+                                  </span>
                                 </div>
-                              )}
+                              ))}
                             </div>
+                          )}
+                          {step.image_query && (
+                            <StepImage
+                              query={step.image_query}
+                              onRegenerate={() =>
+                                regenerateOneStepImage(absIndex)
+                              }
+                              regenerating={regeneratingStep === absIndex}
+                            />
                           )}
                         </div>
                       </li>
