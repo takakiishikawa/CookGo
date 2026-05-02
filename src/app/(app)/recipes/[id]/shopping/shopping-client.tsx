@@ -1,15 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Check, Minus, Plus, RefreshCw } from "lucide-react";
-import {
-  Button,
-  Card,
-  CardContent,
-  PageHeader,
-  toast,
-} from "@takaki/go-design-system";
+import { Button, Card, CardContent, PageHeader } from "@takaki/go-design-system";
 import { AppHeader } from "@/components/layout/app-header";
 import { IngredientThumb } from "@/components/recipe/ingredient-thumb";
 import { cn } from "@/lib/utils";
@@ -37,7 +30,6 @@ export function ShoppingClient({
   initialItems,
   initialServings,
 }: ShoppingClientProps) {
-  const router = useRouter();
   const supabase = createClient();
   const baseServings = Math.max(1, recipe.servings || 1);
   const ingredients = (recipe.ingredients as RecipeIngredient[]) ?? [];
@@ -110,30 +102,6 @@ export function ShoppingClient({
     setCheckedMap((prev) => ({ ...prev, [i]: !prev[i] }));
   };
 
-  const clearList = async () => {
-    if (
-      !confirm(
-        "全部のチェックを外して、まっさらな状態に戻しますか?",
-      )
-    )
-      return;
-    const reset: typeof checkedMap = {};
-    ingredients.forEach((_, i) => {
-      reset[i] = false;
-    });
-    setCheckedMap(reset);
-    try {
-      await supabase
-        .schema(DB_SCHEMA)
-        .from("recipe_shopping_state")
-        .delete()
-        .eq("recipe_id", recipe.id);
-      toast.success("チェックをリセットしました");
-    } catch {
-      toast.error("リセットに失敗しました");
-    }
-  };
-
   const totalCount = ingredients.length;
   const checkedCount = useMemo(
     () => Object.values(checkedMap).filter(Boolean).length,
@@ -155,39 +123,23 @@ export function ShoppingClient({
       />
 
       <div className="px-4 md:px-8 pt-5 pb-24 space-y-5 max-w-4xl">
-        <PageHeader
-          title="買い物"
-          description={recipe.title}
-          actions={
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={clearList}
-              className="gap-1.5"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              リセット
-            </Button>
-          }
-        />
+        <PageHeader title="買い物" description={recipe.title} />
 
-        {/* 進捗 + 人数 */}
+        {/* 進捗 + 人数 (購入済み/家にあるどちらでもチェック=「そろった」) */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm tabular-nums">
             {allDone ? (
               <span className="inline-flex items-center gap-1.5 text-primary font-medium">
                 <Check className="w-4 h-4" />
-                全部買えました
+                全部そろいました
               </span>
             ) : totalCount > 0 ? (
-              <span>
+              <span className="text-muted-foreground">
                 <span className="font-semibold text-foreground">
                   {checkedCount}
                 </span>
-                <span className="text-muted-foreground">
-                  {" "}
-                  / {totalCount} 購入済み
-                </span>
+                {" / "}
+                {totalCount}
               </span>
             ) : null}
           </div>
@@ -246,18 +198,30 @@ export function ShoppingClient({
                       ratio,
                     );
                     return (
-                      <button
+                      <div
                         key={index}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={checked}
                         onClick={() => toggleChecked(index)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleChecked(index);
+                          }
+                        }}
                         className={cn(
-                          "w-full text-left flex items-center gap-3 px-3 py-3 rounded-lg border transition-colors",
+                          "w-full text-left flex items-center gap-3 px-3 py-3 rounded-lg border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                           checked
                             ? "bg-primary/5 border-primary/40"
                             : "bg-card border-border hover:bg-muted",
                         )}
                       >
-                        <IngredientThumb ingredient={ing} size="md" />
+                        <IngredientThumb
+                          ingredient={ing}
+                          size="md"
+                          regenerable
+                        />
                         <div className="flex-1 min-w-0 space-y-0.5">
                           <div className="flex items-baseline gap-2">
                             <p
@@ -312,7 +276,7 @@ export function ShoppingClient({
                         >
                           {checked && <Check className="w-3.5 h-3.5" />}
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>

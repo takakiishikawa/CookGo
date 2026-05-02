@@ -56,7 +56,10 @@ export function IngredientThumb({
   regenerable = false,
 }: IngredientThumbProps) {
   const baseName = ing.name_en ?? ing.name;
-  const query = baseName ? `${baseName} grocery store product` : null;
+  // 単品商品 (single product) を狙う: 「grocery store product」サフィックスは
+  // 棚陳列画像を引きやすいため使わず、bare name を /api/image に渡してバリエーション
+  // 検索 (food / fresh ingredient) でフォールバックさせる
+  const query = baseName || null;
   const [seed, setSeed] = useState(1);
   const { imageUrl, loading } = useFoodImage(query, seed);
 

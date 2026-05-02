@@ -256,7 +256,7 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
               </p>
             )}
           </div>
-          {/* プライマリアクションを右側に縦積み (sm+) */}
+          {/* プライマリアクションを右側に縦積み (sm+)、編集/削除は元レシピ直下 */}
           <div className="hidden sm:flex flex-col gap-1.5 flex-shrink-0">
             <Button
               onClick={openShoppingList}
@@ -298,10 +298,34 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
                 </a>
               </Button>
             )}
+            <div className="flex justify-end gap-0.5 mt-0.5">
+              <Button
+                size="icon"
+                variant="ghost"
+                asChild
+                aria-label="編集"
+                title="編集"
+                className="w-7 h-7 text-muted-foreground"
+              >
+                <Link href={`/recipes/${recipe.id}/edit`}>
+                  <Pencil className="w-3.5 h-3.5" />
+                </Link>
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={deleteRecipe}
+                aria-label="削除"
+                title="削除"
+                className="w-7 h-7 text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* モバイル用プライマリアクション (横並び) */}
+        {/* モバイル用アクション行 (買い物/YouTube/元レシピ + 編集/削除) */}
         <div className="flex sm:hidden flex-wrap items-center gap-2">
           <Button onClick={openShoppingList} className="gap-1.5" size="sm">
             <ShoppingCart className="w-4 h-4" />
@@ -329,32 +353,30 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
               </a>
             </Button>
           )}
-        </div>
-
-        {/* セカンダリアクション (編集・削除): 控えめに右下寄せ */}
-        <div className="flex justify-end gap-1 -mt-2">
-          <Button
-            size="icon"
-            variant="ghost"
-            asChild
-            aria-label="編集"
-            title="編集"
-            className="w-7 h-7 text-muted-foreground"
-          >
-            <Link href={`/recipes/${recipe.id}/edit`}>
-              <Pencil className="w-3.5 h-3.5" />
-            </Link>
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={deleteRecipe}
-            aria-label="削除"
-            title="削除"
-            className="w-7 h-7 text-muted-foreground hover:text-destructive"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </Button>
+          <div className="ml-auto flex gap-0.5">
+            <Button
+              size="icon"
+              variant="ghost"
+              asChild
+              aria-label="編集"
+              title="編集"
+              className="w-7 h-7 text-muted-foreground"
+            >
+              <Link href={`/recipes/${recipe.id}/edit`}>
+                <Pencil className="w-3.5 h-3.5" />
+              </Link>
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={deleteRecipe}
+              aria-label="削除"
+              title="削除"
+              className="w-7 h-7 text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          </div>
         </div>
 
         <Separator />
