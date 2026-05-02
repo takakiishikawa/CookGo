@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Button,
-  PageHeader,
-  toast,
-} from "@takaki/go-design-system";
+import { PageHeader, toast } from "@takaki/go-design-system";
 import { AppHeader } from "@/components/layout/app-header";
 import { RecipeEditor } from "@/components/recipe-editor";
 import { createClient } from "@/lib/supabase/client";
@@ -146,15 +142,7 @@ export function EditRecipeClient({ recipe }: { recipe: Recipe }) {
         ]}
       />
       <div className="px-4 md:px-8 pt-5 pb-12 space-y-5 max-w-3xl">
-        <PageHeader
-          title="レシピ編集"
-          description={recipe.title}
-          actions={
-            <Button variant="ghost" size="sm" onClick={cancel}>
-              レシピに戻る
-            </Button>
-          }
-        />
+        <PageHeader title="レシピ編集" />
 
         <RecipeEditor
           initial={recipeToDraft(recipe)}
