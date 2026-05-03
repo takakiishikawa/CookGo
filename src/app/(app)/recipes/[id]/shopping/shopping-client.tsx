@@ -53,6 +53,25 @@ export function ShoppingClient({
     [ingredients],
   );
 
+  const uncheckedGroups = useMemo(
+    () =>
+      groups
+        .map((g) => ({
+          ...g,
+          items: g.items.filter((it) => !checkedMap[it.index]),
+        }))
+        .filter((g) => g.items.length > 0),
+    [groups, checkedMap],
+  );
+
+  const checkedItems = useMemo(
+    () =>
+      groups.flatMap((g) =>
+        g.items.filter((it) => !!checkedMap[it.index]),
+      ),
+    [groups, checkedMap],
+  );
+
   const saveTimer = useRef<NodeJS.Timeout | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -100,6 +119,87 @@ export function ShoppingClient({
 
   const toggleChecked = (i: number) => {
     setCheckedMap((prev) => ({ ...prev, [i]: !prev[i] }));
+  };
+
+  const renderItem = (index: number, ing: RecipeIngredient) => {
+    const checked = !!checkedMap[index];
+    const amountText = scaleAmountText(ing.amount, ing.unit, ratio);
+    return (
+      <div
+        key={index}
+        role="button"
+        tabIndex={0}
+        aria-pressed={checked}
+        onClick={() => toggleChecked(index)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggleChecked(index);
+          }
+        }}
+        className={cn(
+          "w-full text-left flex items-center gap-3 px-3 py-3 rounded-lg border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          checked
+            ? "bg-primary/5 border-primary/40"
+            : "bg-card border-border hover:bg-muted",
+        )}
+      >
+        <IngredientThumb ingredient={ing} size="md" regenerable />
+        <div className="flex-1 min-w-0 space-y-0.5">
+          <div className="flex items-baseline gap-2">
+            <p
+              className={cn(
+                "text-sm font-medium truncate flex-1",
+                checked && "line-through text-muted-foreground",
+              )}
+            >
+              {ing.name}
+            </p>
+            <p
+              className={cn(
+                "text-xs tabular-nums whitespace-nowrap flex-shrink-0",
+                checked
+                  ? "line-through text-muted-foreground"
+                  : "text-muted-foreground",
+              )}
+            >
+              {amountText}
+            </p>
+          </div>
+          {ing.name_en && (
+            <p
+              className={cn(
+                "text-sm truncate text-muted-foreground/80",
+                checked && "line-through",
+              )}
+            >
+              {ing.name_en}
+            </p>
+          )}
+          {ing.name_vi && (
+            <p
+              className={cn(
+                "text-sm truncate text-muted-foreground/70",
+                checked && "line-through",
+              )}
+            >
+              {ing.name_vi}
+            </p>
+          )}
+        </div>
+        <div
+          className={cn(
+            "w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors",
+            checked
+              ? "bg-primary border-primary text-primary-foreground"
+              : "border-muted-foreground/30",
+          )}
+          aria-hidden
+        >
+          {checked && <Check className="w-3.5 h-3.5" />}
+        </div>
+      </div>
+    );
   };
 
   const totalCount = ingredients.length;
@@ -181,7 +281,7 @@ export function ShoppingClient({
           </Card>
         ) : (
           <div className="space-y-6">
-            {groups.map((group) => (
+            {uncheckedGroups.map((group) => (
               <div key={group.group} className="space-y-2">
                 <div className="flex items-center gap-2 px-1">
                   <span className="text-sm font-semibold">{group.label}</span>
@@ -190,106 +290,30 @@ export function ShoppingClient({
                   </span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {group.items
-                    .slice()
-                    .sort((a, b) => {
-                      const aChecked = !!checkedMap[a.index];
-                      const bChecked = !!checkedMap[b.index];
-                      if (aChecked === bChecked) return 0;
-                      return aChecked ? 1 : -1;
-                    })
-                    .map(({ index, ingredient: ing }) => {
-                    const checked = !!checkedMap[index];
-                    const amountText = scaleAmountText(
-                      ing.amount,
-                      ing.unit,
-                      ratio,
-                    );
-                    return (
-                      <div
-                        key={index}
-                        role="button"
-                        tabIndex={0}
-                        aria-pressed={checked}
-                        onClick={() => toggleChecked(index)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            toggleChecked(index);
-                          }
-                        }}
-                        className={cn(
-                          "w-full text-left flex items-center gap-3 px-3 py-3 rounded-lg border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          checked
-                            ? "bg-primary/5 border-primary/40"
-                            : "bg-card border-border hover:bg-muted",
-                        )}
-                      >
-                        <IngredientThumb
-                          ingredient={ing}
-                          size="md"
-                          regenerable
-                        />
-                        <div className="flex-1 min-w-0 space-y-0.5">
-                          <div className="flex items-baseline gap-2">
-                            <p
-                              className={cn(
-                                "text-sm font-medium truncate flex-1",
-                                checked &&
-                                  "line-through text-muted-foreground",
-                              )}
-                            >
-                              {ing.name}
-                            </p>
-                            <p
-                              className={cn(
-                                "text-xs tabular-nums whitespace-nowrap flex-shrink-0",
-                                checked
-                                  ? "line-through text-muted-foreground"
-                                  : "text-muted-foreground",
-                              )}
-                            >
-                              {amountText}
-                            </p>
-                          </div>
-                          {ing.name_en && (
-                            <p
-                              className={cn(
-                                "text-sm truncate text-muted-foreground/80",
-                                checked && "line-through",
-                              )}
-                            >
-                              {ing.name_en}
-                            </p>
-                          )}
-                          {ing.name_vi && (
-                            <p
-                              className={cn(
-                                "text-sm truncate text-muted-foreground/70",
-                                checked && "line-through",
-                              )}
-                            >
-                              {ing.name_vi}
-                            </p>
-                          )}
-                        </div>
-                        <div
-                          className={cn(
-                            "w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors",
-                            checked
-                              ? "bg-primary border-primary text-primary-foreground"
-                              : "border-muted-foreground/30",
-                          )}
-                          aria-hidden
-                        >
-                          {checked && <Check className="w-3.5 h-3.5" />}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {group.items.map(({ index, ingredient: ing }) =>
+                    renderItem(index, ing),
+                  )}
                 </div>
               </div>
             ))}
+
+            {checkedItems.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <div className="flex items-center gap-2 px-1 pt-2">
+                  <span className="text-sm font-semibold text-muted-foreground">
+                    購入済み
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {checkedItems.length}品
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {checkedItems.map(({ index, ingredient: ing }) =>
+                    renderItem(index, ing),
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
