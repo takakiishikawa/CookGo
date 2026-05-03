@@ -190,7 +190,15 @@ export function ShoppingClient({
                   </span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {group.items.map(({ index, ingredient: ing }) => {
+                  {group.items
+                    .slice()
+                    .sort((a, b) => {
+                      const aChecked = !!checkedMap[a.index];
+                      const bChecked = !!checkedMap[b.index];
+                      if (aChecked === bChecked) return 0;
+                      return aChecked ? 1 : -1;
+                    })
+                    .map(({ index, ingredient: ing }) => {
                     const checked = !!checkedMap[index];
                     const amountText = scaleAmountText(
                       ing.amount,
@@ -247,7 +255,7 @@ export function ShoppingClient({
                           {ing.name_en && (
                             <p
                               className={cn(
-                                "text-[11px] truncate text-muted-foreground/80",
+                                "text-sm truncate text-muted-foreground/80",
                                 checked && "line-through",
                               )}
                             >
@@ -257,7 +265,7 @@ export function ShoppingClient({
                           {ing.name_vi && (
                             <p
                               className={cn(
-                                "text-[11px] truncate text-muted-foreground/70",
+                                "text-sm truncate text-muted-foreground/70",
                                 checked && "line-through",
                               )}
                             >
