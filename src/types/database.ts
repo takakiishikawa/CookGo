@@ -112,3 +112,16 @@ export interface BodyRecord {
   note: string | null;
   created_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Staples（定番 = 定期的に購入する食材・日用品）
+// ---------------------------------------------------------------------------
+
+export interface Staple {
+  id: string;
+  user_id: string;
+  name: string;
+  name_en: string | null;
+  sort_order: number;
+  created_at: string;
+}
