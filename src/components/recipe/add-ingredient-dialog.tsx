@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Button,
   Dialog,
@@ -32,17 +32,31 @@ interface AddIngredientDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (ingredient: RecipeIngredient) => void;
+  /** 指定すると編集モードになり、入力欄に初期値が入り、ボタン文言が「更新」に変わる */
+  initial?: RecipeIngredient | null;
 }
 
 export function AddIngredientDialog({
   open,
   onOpenChange,
   onSubmit,
+  initial,
 }: AddIngredientDialogProps) {
+  const isEdit = !!initial;
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [unit, setUnit] = useState<string>("g");
   const [category, setCategory] = useState<string>("other");
+
+  // dialog を開いた時点で initial の値を入力欄に流し込む
+  useEffect(() => {
+    if (open) {
+      setName(initial?.name ?? "");
+      setAmount(initial?.amount ?? "");
+      setUnit(initial?.unit ?? "g");
+      setCategory(initial?.category ?? "other");
+    }
+  }, [open, initial]);
 
   const reset = () => {
     setName("");
@@ -54,9 +68,10 @@ export function AddIngredientDialog({
   const submit = () => {
     if (!name.trim()) return;
     onSubmit({
+      // 編集時は既存の翻訳情報を引き継ぐ。名前が変わった場合の翻訳更新は save 側で再実行される
       name: name.trim(),
-      name_en: null,
-      name_vi: null,
+      name_en: initial?.name?.trim() === name.trim() ? (initial?.name_en ?? null) : null,
+      name_vi: initial?.name?.trim() === name.trim() ? (initial?.name_vi ?? null) : null,
       amount: amount.trim(),
       unit,
       category,
@@ -74,7 +89,7 @@ export function AddIngredientDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>食材を追加</DialogTitle>
+          <DialogTitle>{isEdit ? "食材を編集" : "食材を追加"}</DialogTitle>
           <DialogDescription>
             カテゴリを選ぶと正しいグループに入ります
           </DialogDescription>
@@ -140,7 +155,7 @@ export function AddIngredientDialog({
             キャンセル
           </Button>
           <Button onClick={submit} disabled={!name.trim()}>
-            追加
+            {isEdit ? "更新" : "追加"}
           </Button>
         </DialogFooter>
       </DialogContent>
