@@ -23,14 +23,28 @@ async function fetchWikipediaImage(query: string): Promise<string | null> {
   return null;
 }
 
+/**
+ * `黒胡椒（サラダ用）` `Olive oil (for salad)` のような括弧サフィックスを除去する。
+ * これらが Unsplash クエリに残ると 0 件ヒットになるため、検索前に必ず外す。
+ */
+function stripParenSuffix(s: string): string {
+  return s
+    .replace(/[（(][^（()）]*[)）]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const query = searchParams.get("query")?.trim();
-  if (!query)
+  const rawQuery = searchParams.get("query")?.trim();
+  if (!rawQuery)
     return NextResponse.json({ imageUrl: null } satisfies ImageResponse);
 
+  // ベースクエリ（括弧除去後）。空になったら元の文字列にフォールバック
+  const query = stripParenSuffix(rawQuery) || rawQuery;
+
   const seedRaw = searchParams.get("seed");
-  const seed = seedRaw ? Math.max(1, Math.min(10, Number(seedRaw) || 1)) : 1;
+  const seed = seedRaw ? Math.max(1, Math.min(50, Number(seedRaw) || 1)) : 1;
   const useCache = seed === 1;
 
   const now = Date.now();
@@ -70,5 +84,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ imageUrl: wiki } satisfies ImageResponse);
   }
 
+  console.warn("image not found", { query, seed });
   return NextResponse.json({ imageUrl: null } satisfies ImageResponse);
 }
