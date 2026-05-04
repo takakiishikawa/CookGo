@@ -307,7 +307,7 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
                   disabled={busy}
                 />
                 <p className="text-xs text-muted-foreground">
-                  日本語のレシピサイトから 5 件提案します
+                  日本語のレシピサイトから 10 件提案します
                 </p>
               </div>
               <Button

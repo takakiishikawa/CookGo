@@ -41,7 +41,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
 
-    const prompt = `あなたは料理アシスタントです。日本語のレシピサイトを web 検索して、以下の条件に合うレシピを **5件** 推薦してください。
+    const prompt = `あなたは料理アシスタントです。日本語のレシピサイトを web 検索して、以下の条件に合うレシピを **10件** 推薦してください。
 
 【ユーザーの条件】
 ${trimmed}
@@ -49,7 +49,7 @@ ${trimmed}
 【検索のコツ】
 - cookpad / クラシル / デリッシュキッチン / Nadia / 楽天レシピ / 個人ブログ / 料理研究家サイト 等から探す
 - なるべく多様なサイト・調理法から選ぶ(同じサイトばかりにしない)
-- 5件は **互いに違う特徴** を持つよう選定
+- 10件は **互いに違う特徴** を持つよう選定
 
 【出力フォーマット】
 最終回答は **JSON のみ**(コードブロック不要・前後の説明不要):
@@ -72,12 +72,12 @@ features の書き方(各レシピを **ぱっと見で差別化** するため)
 
     const response = await client.beta.messages.create({
       model: CLAUDE_SONNET,
-      max_tokens: 4096,
+      max_tokens: 8192,
       tools: [
         {
           type: "web_search_20250305",
           name: "web_search",
-          max_uses: 2,
+          max_uses: 3,
           user_location: { type: "approximate", country: "JP" },
         },
       ],
