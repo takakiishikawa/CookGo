@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Plus, UtensilsCrossed } from "lucide-react";
+import { Plus, ShoppingBasket, UtensilsCrossed } from "lucide-react";
 import { Button, EmptyState } from "@takaki/go-design-system";
 import { AppHeader } from "@/components/layout/app-header";
 import { AddRecipeDialog } from "@/components/recipe/add-recipe-dialog";
-import type { Recipe } from "@/types/database";
+import { StaplesPopup } from "@/components/staples/staples-popup";
+import type { Recipe, Staple } from "@/types/database";
 
 function GalleryTile({
   recipe,
@@ -52,10 +53,13 @@ function GalleryTile({
 
 interface RecipesClientProps {
   recipes: Recipe[];
+  staples: Staple[];
+  userId: string;
 }
 
-export function RecipesClient({ recipes }: RecipesClientProps) {
+export function RecipesClient({ recipes, staples, userId }: RecipesClientProps) {
   const [addOpen, setAddOpen] = useState(false);
+  const [staplesOpen, setStaplesOpen] = useState(false);
 
   return (
     <div className="flex flex-col">
@@ -66,13 +70,24 @@ export function RecipesClient({ recipes }: RecipesClientProps) {
           <h1 className="text-2xl font-semibold leading-tight">
             レシピ
           </h1>
-          <Button
-            size="icon"
-            onClick={() => setAddOpen(true)}
-            aria-label="レシピを追加"
-          >
-            <Plus className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="icon"
+              variant="outline"
+              onClick={() => setStaplesOpen(true)}
+              aria-label="定番を開く"
+              title="定番"
+            >
+              <ShoppingBasket className="w-4 h-4" />
+            </Button>
+            <Button
+              size="icon"
+              onClick={() => setAddOpen(true)}
+              aria-label="レシピを追加"
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
 
         {recipes.length === 0 ? (
@@ -95,6 +110,12 @@ export function RecipesClient({ recipes }: RecipesClientProps) {
       </div>
 
       <AddRecipeDialog open={addOpen} onOpenChange={setAddOpen} />
+      <StaplesPopup
+        open={staplesOpen}
+        onOpenChange={setStaplesOpen}
+        initialStaples={staples}
+        userId={userId}
+      />
     </div>
   );
 }

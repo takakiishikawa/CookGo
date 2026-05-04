@@ -6,7 +6,6 @@ import Link from "next/link";
 import {
   BookOpen,
   Settings,
-  ShoppingBasket,
   Sun,
   Moon,
   FileText,
@@ -31,7 +30,6 @@ import {
 
 const navItems = [
   { href: "/recipes", icon: BookOpen, label: "レシピ" },
-  { href: "/staples", icon: ShoppingBasket, label: "定番" },
 ];
 
 const miniMenuItems = [

@@ -10,7 +10,10 @@ export default async function RecipesPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/");
 
-  const recipes = await db.recipes.getAll(supabase, user.id);
+  const [recipes, staples] = await Promise.all([
+    db.recipes.getAll(supabase, user.id),
+    db.staples.getAll(supabase, user.id),
+  ]);
 
-  return <RecipesClient recipes={recipes} />;
+  return <RecipesClient recipes={recipes} staples={staples} userId={user.id} />;
 }
