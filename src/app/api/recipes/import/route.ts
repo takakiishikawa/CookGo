@@ -27,6 +27,7 @@ export interface ImportFetchFailure {
   error: "fetch_failed";
   message: string;
   source_url: string;
+  reason?: string;
 }
 
 export async function POST(request: Request) {
@@ -55,19 +56,21 @@ export async function POST(request: Request) {
     let stepImages: string[] = [];
 
     if (url && !content) {
-      const html = await fetchHtml(url);
-      if (!html) {
+      const fetched = await fetchHtml(url);
+      if (!fetched.ok || !fetched.html) {
+        console.warn("import fetch_failed", { url, reason: fetched.reason });
         return NextResponse.json(
           {
             error: "fetch_failed",
             message:
               "サイトからの取得に失敗しました。レシピ本文をテキストで貼り付けてください。",
             source_url: url,
+            reason: fetched.reason ?? undefined,
           } satisfies ImportFetchFailure,
           { status: 422 },
         );
       }
-      const extracted = extractFromHtml(html);
+      const extracted = extractFromHtml(fetched.html);
       thumbnail = extracted.ogImage;
       stepImages = extracted.stepImages;
 

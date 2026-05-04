@@ -171,23 +171,46 @@ function extractBodyText(html: string): string {
   return stripped.slice(0, 12_000);
 }
 
-export async function fetchHtml(url: string): Promise<string | null> {
+export interface FetchHtmlResult {
+  ok: boolean;
+  html: string | null;
+  /** 失敗理由（成功時は null）。422 レスポンスや観測のために返す */
+  reason: string | null;
+}
+
+export async function fetchHtml(url: string): Promise<FetchHtmlResult> {
   try {
     const res = await fetch(url, {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "ja,en;q=0.9",
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9,ja;q=0.8",
+        Referer: "https://www.google.com/",
+        "Sec-Ch-Ua":
+          '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"macOS"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "cross-site",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
       },
       signal: AbortSignal.timeout(12_000),
       redirect: "follow",
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      return { ok: false, html: null, reason: `http_${res.status}` };
+    }
     const html = await res.text();
-    if (!html.trim()) return null;
-    return html;
-  } catch {
-    return null;
+    if (!html.trim()) {
+      return { ok: false, html: null, reason: "empty_body" };
+    }
+    return { ok: true, html, reason: null };
+  } catch (error) {
+    const name = error instanceof Error ? error.name : "unknown";
+    return { ok: false, html: null, reason: `fetch_error_${name}` };
   }
 }
