@@ -129,57 +129,60 @@ export function RecipesClient({
     <div className="flex flex-col">
       <AppHeader />
 
-      <div className="px-4 md:px-8 pt-6 pb-12 space-y-6 max-w-6xl">
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            size="icon"
-            variant="outline"
-            onClick={() => setInventoryOpen(true)}
-            aria-label="在庫を開く"
-            title="在庫"
-          >
-            <Package className="w-4 h-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="outline"
-            onClick={() => setStaplesOpen(true)}
-            aria-label="定番を開く"
-            title="定番"
-          >
-            <ShoppingBasket className="w-4 h-4" />
-          </Button>
-          <Button
-            size="icon"
-            onClick={() => setAddOpen(true)}
-            aria-label="レシピを追加"
-          >
-            <Plus className="w-4 h-4" />
-          </Button>
-        </div>
-
-        {/* 主食材タグフィルタ (横スクロール、単一選択) */}
-        {recipes.length > 0 && (
-          <div className="flex gap-1.5 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1">
-            <FilterChip
-              active={selectedTag === null}
-              onClick={() => setSelectedTag(null)}
-              icon={LayoutGrid}
-            >
-              すべて
-            </FilterChip>
-            {MAIN_INGREDIENT_TAGS.map((tag) => (
+      <div className="px-4 md:px-8 pt-3 pb-12 space-y-4 max-w-6xl">
+        {/* タグフィルタ + アクションを 1 行に配置 */}
+        <div className="flex items-center gap-3">
+          {recipes.length > 0 ? (
+            <div className="flex gap-1.5 overflow-x-auto flex-1 min-w-0 pb-1 -mb-1">
               <FilterChip
-                key={tag}
-                active={selectedTag === tag}
-                onClick={() => setSelectedTag(tag)}
-                icon={MAIN_INGREDIENT_TAG_ICON[tag]}
+                active={selectedTag === null}
+                onClick={() => setSelectedTag(null)}
+                icon={LayoutGrid}
               >
-                {tag}
+                すべて
               </FilterChip>
-            ))}
+              {MAIN_INGREDIENT_TAGS.map((tag) => (
+                <FilterChip
+                  key={tag}
+                  active={selectedTag === tag}
+                  onClick={() => setSelectedTag(tag)}
+                  icon={MAIN_INGREDIENT_TAG_ICON[tag]}
+                >
+                  {tag}
+                </FilterChip>
+              ))}
+            </div>
+          ) : (
+            <div className="flex-1" />
+          )}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              size="icon"
+              variant="outline"
+              onClick={() => setInventoryOpen(true)}
+              aria-label="在庫を開く"
+              title="在庫"
+            >
+              <Package className="w-4 h-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="outline"
+              onClick={() => setStaplesOpen(true)}
+              aria-label="定番を開く"
+              title="定番"
+            >
+              <ShoppingBasket className="w-4 h-4" />
+            </Button>
+            <Button
+              size="icon"
+              onClick={() => setAddOpen(true)}
+              aria-label="レシピを追加"
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
           </div>
-        )}
+        </div>
 
         {recipes.length === 0 ? (
           <EmptyState
