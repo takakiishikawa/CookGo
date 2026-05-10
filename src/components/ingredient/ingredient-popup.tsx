@@ -62,37 +62,49 @@ export function IngredientPopup({
   onOpenChange,
 }: IngredientPopupProps) {
   const open = ingredient !== null;
+  const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [errored, setErrored] = useState(false);
   const [info, setInfo] = useState<IngredientInfo | null>(null);
 
   useEffect(() => {
     if (!ingredient) {
       setInfo(null);
+      setLoading(false);
+      setGenerating(false);
+      setErrored(false);
       return;
     }
     let cancelled = false;
     setInfo(null);
+    setErrored(false);
+    setLoading(true);
     setGenerating(false);
 
     (async () => {
-      // まず DB を引く
-      const cached = await fetchInfo(ingredient.name);
-      if (cancelled) return;
-      if (cached) {
-        setInfo(cached);
-        return;
-      }
-      // 無ければ AI で生成して保存(以後は即時表示される)
-      setGenerating(true);
       try {
-        const generated = await generateInfo(ingredient);
-        if (!cancelled && generated) setInfo(generated);
-      } catch (err) {
-        if (!cancelled) {
-          toast.error(err instanceof Error ? err.message : "生成に失敗しました");
+        const cached = await fetchInfo(ingredient.name);
+        if (cancelled) return;
+        if (cached) {
+          setInfo(cached);
+          return;
         }
+        // GET 完了 → 未登録なので AI で生成して保存
+        setLoading(false);
+        setGenerating(true);
+        const generated = await generateInfo(ingredient);
+        if (cancelled) return;
+        if (generated) setInfo(generated);
+        else setErrored(true);
+      } catch (err) {
+        if (cancelled) return;
+        setErrored(true);
+        toast.error(err instanceof Error ? err.message : "生成に失敗しました");
       } finally {
-        if (!cancelled) setGenerating(false);
+        if (!cancelled) {
+          setLoading(false);
+          setGenerating(false);
+        }
       }
     })();
 
@@ -119,8 +131,8 @@ export function IngredientPopup({
               )}
             </div>
 
-            {generating && !info ? (
-              <GeneratingState name={ingredient.name} />
+            {(loading || generating) && !info ? (
+              <LoadingState name={ingredient.name} generating={generating} />
             ) : info ? (
               <div className="mt-4 space-y-5">
                 {info.origin && (
@@ -209,11 +221,11 @@ export function IngredientPopup({
                   </Section>
                 )}
               </div>
-            ) : (
+            ) : errored ? (
               <div className="py-8 text-center text-sm text-muted-foreground">
                 この食材の詳細はまだ生成できませんでした。あとで再度開いてみてください。
               </div>
-            )}
+            ) : null}
           </>
         )}
       </DialogContent>
@@ -221,20 +233,28 @@ export function IngredientPopup({
   );
 }
 
-function GeneratingState({ name }: { name: string }) {
+function LoadingState({
+  name,
+  generating,
+}: {
+  name: string;
+  generating: boolean;
+}) {
   return (
     <div className="mt-6 py-10 flex flex-col items-center gap-3 text-center">
-      <div className="relative">
-        <Sparkles className="w-8 h-8 text-primary animate-pulse" />
-      </div>
+      <Sparkles className="w-8 h-8 text-primary animate-pulse" />
       <div className="space-y-1">
         <p className="text-base font-semibold">「{name}」を調べています</p>
-        <p className="text-sm text-muted-foreground">
-          AI が由来や味の秘密を集めています…
-        </p>
-        <p className="text-xs text-muted-foreground">
-          初回のみ少し時間がかかります(次からは一瞬で開きます)
-        </p>
+        {generating && (
+          <>
+            <p className="text-sm text-muted-foreground">
+              AI が由来や味の秘密を集めています…
+            </p>
+            <p className="text-xs text-muted-foreground">
+              初回のみ少し時間がかかります(次からは一瞬で開きます)
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
