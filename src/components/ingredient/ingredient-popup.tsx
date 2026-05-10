@@ -176,11 +176,7 @@ export function IngredientPopup({
                         const label = stripEmoji(t);
                         if (!label) return null;
                         return (
-                          <Badge
-                            key={`${t}-${i}`}
-                            variant="secondary"
-                            className="text-xs font-normal"
-                          >
+                          <Badge key={`${t}-${i}`} variant="secondary">
                             {label}
                           </Badge>
                         );

@@ -260,13 +260,17 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
         {step === "input" && (
           <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
             <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="url" className="gap-1.5">
-                <Globe className="w-3.5 h-3.5" />
-                URL から取り込む
+              <TabsTrigger value="url">
+                <span className="flex items-center justify-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5" />
+                  URL から取り込む
+                </span>
               </TabsTrigger>
-              <TabsTrigger value="ai" className="gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                レシピを探す
+              <TabsTrigger value="ai">
+                <span className="flex items-center justify-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  レシピを探す
+                </span>
               </TabsTrigger>
             </TabsList>
 
@@ -284,9 +288,6 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
                     if (e.key === "Enter") importAndSave({ url: urlInput });
                   }}
                 />
-                <p className="text-xs text-muted-foreground">
-                  URL を貼ると、AI がレシピを読み解いて自動で登録します。読み取れないサイトはテキスト貼り付けに切り替わります。
-                </p>
               </div>
               <DialogFooter className="pt-1">
                 <Button
@@ -315,9 +316,6 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
                   placeholder="例: 鶏胸肉の meal prep / ベトナム風朝食 / 簡単パスタ"
                   disabled={busy}
                 />
-                <p className="text-xs text-muted-foreground">
-                  日本語のレシピサイトから 10 件提案します
-                </p>
               </div>
               <DialogFooter className="pt-1">
                 <Button

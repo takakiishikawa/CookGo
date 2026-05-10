@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   Check,
   Info,
@@ -11,6 +12,7 @@ import {
   RefreshCw,
   RotateCcw,
   Trash2,
+  UtensilsCrossed,
   X,
 } from "lucide-react";
 import {
@@ -304,7 +306,7 @@ export function ShoppingClient({
           <IngredientThumb
             ingredient={ing}
             size="md"
-            regenerable={false}
+            regenerable={!editMode}
             queryContext="supermarket"
           />
           <div className="flex-1 min-w-0 space-y-0.5">
@@ -402,7 +404,7 @@ export function ShoppingClient({
           <IngredientThumb
             ingredient={ing}
             size="md"
-            regenerable={false}
+            regenerable={!editMode}
             queryContext="supermarket"
           />
           <div className="flex-1 min-w-0 space-y-0.5">
@@ -475,14 +477,33 @@ export function ShoppingClient({
       <AppHeader
         breadcrumbs={[
           { label: "レシピ", href: "/recipes" },
-          { label: recipe.title },
           { label: "買い物" },
         ]}
       />
 
       <div className="px-4 md:px-8 pt-5 pb-24 space-y-5 max-w-4xl">
         <div className="flex items-start justify-between gap-3">
-          <PageHeader title="買い物" description={recipe.title} />
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-muted">
+              {recipe.image_url ? (
+                <Image
+                  src={recipe.image_url}
+                  alt={recipe.title}
+                  fill
+                  sizes="48px"
+                  className="object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <UtensilsCrossed
+                    className="w-5 h-5 text-muted-foreground/40"
+                    strokeWidth={1.5}
+                  />
+                </div>
+              )}
+            </div>
+            <PageHeader title="買い物" description={recipe.title} />
+          </div>
           {!editMode ? (
             <Button
               size="sm"

@@ -13,6 +13,8 @@ interface UseFoodImageOptions {
   context?: "supermarket";
   /** protein/vegetable/carb/seasoning/other。取得失敗時のフォールバック用 */
   category?: string | null;
+  /** もう一方の言語の名前(任意)。日英両方を試して取りこぼしを減らす */
+  queryAlt?: string | null;
 }
 
 export function useFoodImage(
@@ -24,7 +26,7 @@ export function useFoodImage(
   const [loading, setLoading] = useState(!!query);
   const [error, setError] = useState(false);
 
-  const { context, category } = options;
+  const { context, category, queryAlt } = options;
 
   useEffect(() => {
     if (!query) {
@@ -41,6 +43,7 @@ export function useFoodImage(
     if (seed > 1) params.set("seed", String(seed));
     if (context) params.set("context", context);
     if (category) params.set("category", category);
+    if (queryAlt && queryAlt !== query) params.set("queryAlt", queryAlt);
     fetch(`/api/image?${params.toString()}`)
       .then((r) => r.json())
       .then((d: { imageUrl: string | null }) => {
@@ -58,7 +61,7 @@ export function useFoodImage(
     return () => {
       cancelled = true;
     };
-  }, [query, seed, context, category]);
+  }, [query, seed, context, category, queryAlt]);
 
   return { imageUrl, loading, error };
 }

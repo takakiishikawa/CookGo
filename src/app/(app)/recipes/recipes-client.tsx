@@ -67,9 +67,9 @@ function GalleryTile({
     <button
       type="button"
       onClick={() => onOpen(recipe)}
-      className="group block w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl"
+      className="group block w-full text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl"
     >
-      <div className="relative aspect-square overflow-hidden rounded-xl bg-muted">
+      <div className="relative aspect-square overflow-hidden rounded-xl bg-muted ring-1 ring-transparent transition-shadow duration-200 group-hover:ring-primary/40 group-hover:shadow-lg">
         {recipe.image_url ? (
           <Image
             src={recipe.image_url}
@@ -88,7 +88,7 @@ function GalleryTile({
           </div>
         )}
         {/* タイトル: モバイルは常時控えめ、PC はホバー時にだけ表示 */}
-        <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/65 via-black/20 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+        <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/70 via-black/25 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
           <p className="text-white text-sm font-medium leading-tight line-clamp-2 drop-shadow-sm">
             {recipe.title}
           </p>

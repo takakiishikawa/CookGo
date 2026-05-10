@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { RefreshCw, Sparkles, UtensilsCrossed } from "lucide-react";
 import { Skeleton } from "@takaki/go-design-system";
 import { useFoodImage } from "@/hooks/use-food-image";
+import { useImageSeed } from "@/hooks/use-image-seed";
 import type { RecipeIngredient } from "@/types/database";
 import { cn } from "@/lib/utils";
 
@@ -48,8 +48,10 @@ const REGEN_ICON_SIZE: Record<ThumbSize, string> = {
 };
 
 /**
- * 食材のサムネイル。queryContext + category を /api/image に渡し、
- * 取得失敗時はカテゴリ代表画像にフォールバックする。
+ * 食材のサムネイル。
+ * - 日本語名を主クエリ、英訳を queryAlt に渡し、両言語で画像を探す
+ * - regenerable=true で sparkle ボタンを重ね、押下毎に seed を 1 つ進める
+ *   選んだ seed は localStorage に保持されリロード後も維持される
  */
 export function IngredientThumb({
   ingredient: ing,
@@ -58,12 +60,15 @@ export function IngredientThumb({
   regenerable = false,
   queryContext,
 }: IngredientThumbProps) {
-  const baseName = ing.name_en ?? ing.name;
-  const query = baseName || null;
-  const [seed, setSeed] = useState(1);
+  const query = ing.name || null;
+  const queryAlt =
+    ing.name_en && ing.name_en !== ing.name ? ing.name_en : null;
+  const seedKey = ing.name ? `ingredient:${ing.name}` : null;
+  const [seed, regenerate] = useImageSeed(seedKey);
   const { imageUrl, loading } = useFoodImage(query, seed, {
     context: queryContext,
     category: ing.category ?? null,
+    queryAlt,
   });
 
   const sizeClass = SIZE_CLASS[size];
@@ -110,7 +115,7 @@ export function IngredientThumb({
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
-            setSeed((s) => s + 1);
+            regenerate();
           }}
           className={cn(
             "absolute top-0.5 right-0.5 inline-flex items-center justify-center rounded-full bg-black/55 backdrop-blur text-white hover:bg-black/75 transition-colors",

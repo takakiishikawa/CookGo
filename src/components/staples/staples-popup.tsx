@@ -147,7 +147,12 @@ export function StaplesPopup({
             {staples.map((s) => (
               <div key={s.id} className="space-y-1.5">
                 <div className="relative aspect-square overflow-hidden rounded-xl bg-muted">
-                  <StapleThumb name={s.name} nameEn={s.name_en} />
+                  <StapleThumb
+                    storageKey={s.id}
+                    name={s.name}
+                    nameEn={s.name_en}
+                    regenerable
+                  />
                   <button
                     type="button"
                     onClick={() => handleDelete(s.id)}

@@ -78,6 +78,14 @@ export function scaleAmountText(
   const a = (amount ?? "").trim();
   const u = (unit ?? "").trim();
 
+  // 質的表現(少々/適量/ひとつまみ等)は数値スケール不可なので、ratio≠1 のときだけ倍率を後ろに添える
+  const QUALITATIVE_RE = /少々|適量|ひとつまみ|お好みで?|とある/;
+  if (QUALITATIVE_RE.test(a)) {
+    const base = u ? `${a}${u}` : a;
+    if (Math.abs(ratio - 1) < 0.01) return base;
+    return `${base} × ${formatNumber(ratio)}`;
+  }
+
   // Pattern 2/3: 大さじ・小さじ・カップが prefix で含まれる
   for (const prefix of JP_PREFIXES) {
     if (a.startsWith(prefix)) {

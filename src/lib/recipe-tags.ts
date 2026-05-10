@@ -26,3 +26,49 @@ export function extractCountryName(
 ): string {
   return stripEmoji(countryTag);
 }
+
+/**
+ * 国名 → 国旗絵文字。表示専用(データには絵文字を保存しない)。
+ * 不明な国名は null を返す。
+ */
+const COUNTRY_FLAG_MAP: Record<string, string> = {
+  日本: "🇯🇵",
+  中国: "🇨🇳",
+  韓国: "🇰🇷",
+  台湾: "🇹🇼",
+  香港: "🇭🇰",
+  タイ: "🇹🇭",
+  ベトナム: "🇻🇳",
+  インドネシア: "🇮🇩",
+  マレーシア: "🇲🇾",
+  フィリピン: "🇵🇭",
+  シンガポール: "🇸🇬",
+  インド: "🇮🇳",
+  ネパール: "🇳🇵",
+  イタリア: "🇮🇹",
+  フランス: "🇫🇷",
+  スペイン: "🇪🇸",
+  ドイツ: "🇩🇪",
+  イギリス: "🇬🇧",
+  ロシア: "🇷🇺",
+  トルコ: "🇹🇷",
+  ギリシャ: "🇬🇷",
+  ポルトガル: "🇵🇹",
+  オランダ: "🇳🇱",
+  ベルギー: "🇧🇪",
+  メキシコ: "🇲🇽",
+  ペルー: "🇵🇪",
+  ブラジル: "🇧🇷",
+  アルゼンチン: "🇦🇷",
+  アメリカ: "🇺🇸",
+  カナダ: "🇨🇦",
+  エジプト: "🇪🇬",
+  モロッコ: "🇲🇦",
+  オーストラリア: "🇦🇺",
+  ニュージーランド: "🇳🇿",
+};
+
+export function getCountryFlag(countryName: string | null): string | null {
+  if (!countryName) return null;
+  return COUNTRY_FLAG_MAP[countryName] ?? null;
+}
