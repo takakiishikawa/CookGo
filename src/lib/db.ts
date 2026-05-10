@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DB_SCHEMA } from "./constants";
-import type { Recipe, Staple } from "@/types/database";
+import type { InventoryItem, Recipe, Staple } from "@/types/database";
 
 function s(supabase: SupabaseClient) {
   return supabase.schema(DB_SCHEMA);
@@ -90,6 +90,20 @@ export const db = {
     },
     delete: async (supabase: SupabaseClient, id: string) => {
       return s(supabase).from("staples").delete().eq("id", id);
+    },
+  },
+  inventory: {
+    getAll: async (
+      supabase: SupabaseClient,
+      userId: string,
+    ): Promise<InventoryItem[]> => {
+      const { data } = await s(supabase)
+        .from("inventory_items")
+        .select("*")
+        .eq("user_id", userId)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+      return (data ?? []) as InventoryItem[];
     },
   },
 };

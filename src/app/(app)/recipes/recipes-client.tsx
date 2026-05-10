@@ -3,12 +3,13 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Plus, ShoppingBasket, UtensilsCrossed } from "lucide-react";
+import { Package, Plus, ShoppingBasket, UtensilsCrossed } from "lucide-react";
 import { Button, EmptyState } from "@takaki/go-design-system";
 import { AppHeader } from "@/components/layout/app-header";
 import { AddRecipeDialog } from "@/components/recipe/add-recipe-dialog";
 import { StaplesPopup } from "@/components/staples/staples-popup";
-import type { Recipe, Staple } from "@/types/database";
+import { InventoryPopup } from "@/components/inventory/inventory-popup";
+import type { InventoryItem, Recipe, Staple } from "@/types/database";
 
 function GalleryTile({
   recipe,
@@ -54,12 +55,19 @@ function GalleryTile({
 interface RecipesClientProps {
   recipes: Recipe[];
   staples: Staple[];
+  inventory: InventoryItem[];
   userId: string;
 }
 
-export function RecipesClient({ recipes, staples, userId }: RecipesClientProps) {
+export function RecipesClient({
+  recipes,
+  staples,
+  inventory,
+  userId,
+}: RecipesClientProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [staplesOpen, setStaplesOpen] = useState(false);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
 
   return (
     <div className="flex flex-col">
@@ -71,6 +79,15 @@ export function RecipesClient({ recipes, staples, userId }: RecipesClientProps) 
             レシピ
           </h1>
           <div className="flex items-center gap-2">
+            <Button
+              size="icon"
+              variant="outline"
+              onClick={() => setInventoryOpen(true)}
+              aria-label="在庫を開く"
+              title="在庫"
+            >
+              <Package className="w-4 h-4" />
+            </Button>
             <Button
               size="icon"
               variant="outline"
@@ -114,6 +131,12 @@ export function RecipesClient({ recipes, staples, userId }: RecipesClientProps) 
         open={staplesOpen}
         onOpenChange={setStaplesOpen}
         initialStaples={staples}
+        userId={userId}
+      />
+      <InventoryPopup
+        open={inventoryOpen}
+        onOpenChange={setInventoryOpen}
+        initialItems={inventory}
         userId={userId}
       />
     </div>
