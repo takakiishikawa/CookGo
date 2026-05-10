@@ -23,13 +23,6 @@ export const RECIPE_SOURCE_LABELS: Record<RecipeSourceTag, string> = {
 export const MAIN_INGREDIENT_TAGS = ["魚", "肉", "麺", "つまみ・副菜"] as const;
 export type MainIngredientTag = (typeof MAIN_INGREDIENT_TAGS)[number];
 
-export const MAIN_INGREDIENT_TAG_EMOJI: Record<MainIngredientTag, string> = {
-  魚: "🐟",
-  肉: "🍖",
-  麺: "🍜",
-  "つまみ・副菜": "🥢",
-};
-
 /** 栄養プロファイルタグの代表例(AI は範囲外も可) */
 export const NUTRITION_TAG_SUGGESTIONS = [
   "高タンパク",

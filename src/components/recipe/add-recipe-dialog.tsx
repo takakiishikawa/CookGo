@@ -21,6 +21,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   Input,
@@ -32,6 +33,7 @@ import {
   Textarea,
   toast,
 } from "@takaki/go-design-system";
+import { cn } from "@/lib/utils";
 import type { DraftRecipe } from "@/types/api";
 import type {
   RecipeRecommendation,
@@ -239,7 +241,12 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className={cn(
+          "max-h-[90vh] overflow-y-auto",
+          step === "recommendations" ? "max-w-3xl" : "max-w-md",
+        )}
+      >
         <DialogHeader>
           <DialogTitle>レシピを追加</DialogTitle>
           {step === "input" && (
@@ -281,18 +288,20 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
                   URL を貼ると、AI がレシピを読み解いて自動で登録します。読み取れないサイトはテキスト貼り付けに切り替わります。
                 </p>
               </div>
-              <Button
-                onClick={() => importAndSave({ url: urlInput })}
-                disabled={busy || !urlInput.trim()}
-                className="w-full gap-1.5"
-              >
-                {busy ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
-                {busy ? "取り込み中..." : "AI に取り込んでもらう"}
-              </Button>
+              <DialogFooter className="pt-1">
+                <Button
+                  onClick={() => importAndSave({ url: urlInput })}
+                  disabled={busy || !urlInput.trim()}
+                  className="gap-1.5"
+                >
+                  {busy ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                  {busy ? "取り込み中..." : "AI に取り込んでもらう"}
+                </Button>
+              </DialogFooter>
             </TabsContent>
 
             <TabsContent value="ai" className="mt-4 space-y-4">
@@ -310,18 +319,20 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
                   日本語のレシピサイトから 10 件提案します
                 </p>
               </div>
-              <Button
-                onClick={fetchRecommendations}
-                disabled={busy || !aiQuery.trim()}
-                className="w-full gap-1.5"
-              >
-                {busy ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
-                {busy ? "探しています..." : "5 件探してもらう"}
-              </Button>
+              <DialogFooter className="pt-1">
+                <Button
+                  onClick={fetchRecommendations}
+                  disabled={busy || !aiQuery.trim()}
+                  className="gap-1.5"
+                >
+                  {busy ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                  {busy ? "探しています..." : "10 件探してもらう"}
+                </Button>
+              </DialogFooter>
             </TabsContent>
           </Tabs>
         )}
@@ -454,10 +465,9 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
               disabled={busy}
               className="font-mono text-xs"
             />
-            <div className="flex gap-2">
+            <DialogFooter>
               <Button
                 variant="outline"
-                className="flex-1"
                 onClick={() => {
                   setPasteText("");
                   setPendingUrl(null);
@@ -467,7 +477,7 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
                 戻る
               </Button>
               <Button
-                className="flex-1 gap-1.5"
+                className="gap-1.5"
                 onClick={() =>
                   importAndSave({
                     content: pasteText,
@@ -483,7 +493,7 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
                 )}
                 {busy ? "取り込み中..." : "AI で取り込む"}
               </Button>
-            </div>
+            </DialogFooter>
           </div>
         )}
       </DialogContent>

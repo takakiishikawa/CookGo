@@ -13,6 +13,7 @@ import {
   toast,
 } from "@takaki/go-design-system";
 import type { IngredientInfo, RecipeIngredient } from "@/types/database";
+import { stripEmoji } from "@/lib/recipe-tags";
 
 interface IngredientPopupProps {
   ingredient: RecipeIngredient | null;
@@ -171,15 +172,19 @@ export function IngredientPopup({
                 {info.nutrition_tags && info.nutrition_tags.length > 0 && (
                   <Section title="栄養">
                     <div className="flex flex-wrap gap-1.5">
-                      {info.nutrition_tags.map((t, i) => (
-                        <Badge
-                          key={`${t}-${i}`}
-                          variant="secondary"
-                          className="text-xs font-normal"
-                        >
-                          {t}
-                        </Badge>
-                      ))}
+                      {info.nutrition_tags.map((t, i) => {
+                        const label = stripEmoji(t);
+                        if (!label) return null;
+                        return (
+                          <Badge
+                            key={`${t}-${i}`}
+                            variant="secondary"
+                            className="text-xs font-normal"
+                          >
+                            {label}
+                          </Badge>
+                        );
+                      })}
                     </div>
                   </Section>
                 )}

@@ -17,7 +17,9 @@ export function InventoryThumb({
   className,
 }: InventoryThumbProps) {
   const query = nameEn || name || null;
-  const { imageUrl, loading } = useFoodImage(query);
+  const { imageUrl, loading } = useFoodImage(query, 1, {
+    context: "supermarket",
+  });
 
   if (loading) {
     return <Skeleton className={cn("w-full h-full rounded-xl", className)} />;

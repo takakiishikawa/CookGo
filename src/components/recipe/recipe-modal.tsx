@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Camera,
   ExternalLink,
+  Globe2,
   RefreshCw,
   ShoppingCart,
   Trash2,
@@ -23,7 +24,11 @@ import {
 import type { Recipe } from "@/types/database";
 import { createClient } from "@/lib/supabase/client";
 import { DB_SCHEMA } from "@/lib/constants";
-import { extractCountryFlag } from "@/lib/utils";
+import {
+  MAIN_INGREDIENT_TAG_ICON,
+  extractCountryName,
+  stripEmoji,
+} from "@/lib/recipe-tags";
 
 interface RecipeModalProps {
   recipe: Recipe | null;
@@ -58,7 +63,10 @@ export function RecipeModal({
     );
   }
 
-  const flag = extractCountryFlag(recipe.country_tag);
+  const countryName = extractCountryName(recipe.country_tag);
+  const MainIcon = recipe.main_ingredient_tag
+    ? MAIN_INGREDIENT_TAG_ICON[recipe.main_ingredient_tag]
+    : null;
   const youtubeSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
     recipe.title + " 作り方",
   )}`;
@@ -184,7 +192,6 @@ export function RecipeModal({
 
         <div className="px-5 py-5 space-y-4">
           <DialogTitle className="text-xl md:text-2xl font-semibold leading-tight">
-            {flag && <span className="mr-1.5">{flag}</span>}
             {recipe.title}
           </DialogTitle>
 
@@ -194,16 +201,24 @@ export function RecipeModal({
             </p>
           )}
 
-          {/* 1行目: 分類タグ(国 + 主食材) */}
-          {(recipe.country_tag || recipe.main_ingredient_tag) && (
+          {/* 1行目: 分類タグ(発祥国 + 主食材) */}
+          {(countryName || recipe.main_ingredient_tag) && (
             <div className="flex flex-wrap gap-1.5">
-              {recipe.country_tag && (
-                <Badge variant="outline" className="text-xs font-normal">
-                  {recipe.country_tag}
+              {countryName && (
+                <Badge
+                  variant="outline"
+                  className="gap-1 text-xs font-normal"
+                >
+                  <Globe2 className="w-3 h-3" />
+                  {countryName}
                 </Badge>
               )}
-              {recipe.main_ingredient_tag && (
-                <Badge variant="outline" className="text-xs font-normal">
+              {recipe.main_ingredient_tag && MainIcon && (
+                <Badge
+                  variant="outline"
+                  className="gap-1 text-xs font-normal"
+                >
+                  <MainIcon className="w-3 h-3" />
                   {recipe.main_ingredient_tag}
                 </Badge>
               )}
@@ -213,15 +228,19 @@ export function RecipeModal({
           {/* 2行目: 栄養プロファイルタグ */}
           {recipe.nutrition_tags && recipe.nutrition_tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              {recipe.nutrition_tags.map((t, i) => (
-                <Badge
-                  key={`${t}-${i}`}
-                  variant="secondary"
-                  className="text-xs font-normal"
-                >
-                  {t}
-                </Badge>
-              ))}
+              {recipe.nutrition_tags.map((t, i) => {
+                const label = stripEmoji(t);
+                if (!label) return null;
+                return (
+                  <Badge
+                    key={`${t}-${i}`}
+                    variant="secondary"
+                    className="text-xs font-normal"
+                  >
+                    {label}
+                  </Badge>
+                );
+              })}
             </div>
           )}
 

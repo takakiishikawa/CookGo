@@ -18,8 +18,8 @@ export const SCHEMA_SAMPLE = `{
   "prep_time_min": 20,
   "servings": 1,
   "main_ingredient_tag": "肉",
-  "country_tag": "🇯🇵日本",
-  "nutrition_tags": ["🥩 高タンパク", "💊 ビタミンB豊富"],
+  "country_tag": "日本",
+  "nutrition_tags": ["高タンパク", "ビタミンB豊富"],
   "ingredients": [
     { "name": "豚ロース", "amount": "150", "unit": "g", "category": "protein" },
     { "name": "醤油", "amount": "大さじ2", "unit": "", "category": "seasoning" }
@@ -37,7 +37,7 @@ export const SCHEMA_SAMPLE = `{
       "alternatives": [
         { "name": "鶏もも肉", "reason": "脂身の甘みが似ていて代用しやすい" }
       ],
-      "nutrition_tags": ["🥩 高タンパク", "💊 ビタミンB豊富"]
+      "nutrition_tags": ["高タンパク", "ビタミンB豊富"]
     },
     {
       "name": "醤油",
@@ -63,13 +63,14 @@ export const FIXED_CONSTRAINTS = `【固定条件（最優先・必ず守る）�
 - 食材は具体的に種目まで（例：「肉」ではなく「豚バラ肉」「鶏もも肉」など）
 - ingredients[*].unit は数値量のときは "g" / "ml" など。"大さじ2" のように amount に単位が含まれる場合は空文字 ""
 - name_en / name_vi はサーバー側で後から自動付与するため出力不要（出力しても無視される）
+- 出力する全テキストには絵文字・国旗記号を含めない(プレーン日本語のみ)
 - main_ingredient_tag は必須。次の 4 種から 1 つだけ選ぶ:
   - "魚" : 魚介類が主役
   - "肉" : 鶏豚牛などの獣肉が主役
   - "麺" : 麺類が主役
   - "つまみ・副菜" : 上記に当てはまらない、または小皿/酒のあて
-- country_tag は必須。発祥国を絵文字フラグ + 国名(日本語)で出力。例: "🇯🇵日本" / "🇨🇳中国" / "🇰🇷韓国" / "🇹🇭タイ" / "🇻🇳ベトナム" / "🇮🇹イタリア" / "🇫🇷フランス" / "🇲🇽メキシコ" / "🇮🇳インド" / "🇺🇸アメリカ"。多国籍融合料理で迷ったら、最も近い 1 国を選ぶ
-- nutrition_tags は 2〜3 個。先頭に絵文字を付ける。例: "🥩 高タンパク" / "🟫 炭水化物中心" / "🌿 食物繊維豊富" / "💊 ビタミンB豊富" / "🪨 マグネシウム豊富" / "🥑 良質脂質"。範囲外でも適切なら可
+- country_tag は必須。発祥国を日本語の国名のみで出力(絵文字や記号は付けない)。例: "日本" / "中国" / "韓国" / "タイ" / "ベトナム" / "イタリア" / "フランス" / "メキシコ" / "インド" / "アメリカ"。多国籍融合料理で迷ったら、最も近い 1 国を選ぶ
+- nutrition_tags は 2〜3 個。プレーン日本語の短いラベルにする(絵文字を付けない)。例: "高タンパク" / "炭水化物中心" / "食物繊維豊富" / "ビタミンB豊富" / "マグネシウム豊富" / "良質脂質"。範囲外でも適切なら可
 - ingredient_info は ingredients と同数(=各食材につき必ず1件)。各オブジェクトのフィールドは:
   - name: 対応する ingredients[*].name と完全一致
   - category: ingredients[*].category と同じ値
@@ -78,7 +79,7 @@ export const FIXED_CONSTRAINTS = `【固定条件（最優先・必ず守る）�
   - taste_profile: 感じる味と、なぜそう感じるかの仕組み(1〜2文)
   - pairings: 相性のいい食材 1〜3 個。各 { food, reason } で reason は端的に1文
   - alternatives: 代替品 1〜3 個。ホーチミンで入手しやすい順。各 { name, reason }
-  - nutrition_tags: 食材単位での栄養特徴 0〜3 個(レシピ全体の nutrition_tags と同じ表記体系)`;
+  - nutrition_tags: 食材単位での栄養特徴 0〜3 個(プレーン日本語の短いラベル)`;
 
 export interface RawDraft {
   title?: unknown;

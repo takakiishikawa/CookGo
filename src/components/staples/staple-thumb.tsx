@@ -13,7 +13,9 @@ interface StapleThumbProps {
 
 export function StapleThumb({ name, nameEn, className }: StapleThumbProps) {
   const query = nameEn || name || null;
-  const { imageUrl, loading } = useFoodImage(query);
+  const { imageUrl, loading } = useFoodImage(query, 1, {
+    context: "supermarket",
+  });
 
   if (loading) {
     return (
