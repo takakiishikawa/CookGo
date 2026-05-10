@@ -19,17 +19,16 @@ export const RECIPE_SOURCE_LABELS: Record<RecipeSourceTag, string> = {
 // レシピ分類タグ
 // ---------------------------------------------------------------------------
 
-/** ごはん(主たる食事) / 軽食(つまみ・小腹埋め) */
-export type RecipeScene = "meal" | "snack";
+/** 主食材タグ。トップのフィルタで使う */
+export const MAIN_INGREDIENT_TAGS = ["魚", "肉", "麺", "つまみ・副菜"] as const;
+export type MainIngredientTag = (typeof MAIN_INGREDIENT_TAGS)[number];
 
-export const RECIPE_SCENE_LABELS: Record<RecipeScene, string> = {
-  meal: "ごはん",
-  snack: "軽食",
+export const MAIN_INGREDIENT_TAG_EMOJI: Record<MainIngredientTag, string> = {
+  魚: "🐟",
+  肉: "🍖",
+  麺: "🍜",
+  "つまみ・副菜": "🥢",
 };
-
-/** AI に投げる例示用のジャンル候補。フィルタ UI でも使う初期セット */
-export const RECIPE_GENRE_TAGS = ["和食", "中華", "夜食", "多国籍"] as const;
-export type RecipeGenreTag = (typeof RECIPE_GENRE_TAGS)[number];
 
 /** 栄養プロファイルタグの代表例(AI は範囲外も可) */
 export const NUTRITION_TAG_SUGGESTIONS = [
@@ -56,10 +55,10 @@ export interface Recipe {
   ingredients: RecipeIngredient[] | null;
   ai_generated: boolean;
   source_tag: RecipeSourceTag | null;
-  /** 主食(meal) か つまみ・小腹埋め(snack) か */
-  scene: RecipeScene | null;
-  /** 例: ["和食"], ["中華", "夜食"] */
-  genre_tags: string[];
+  /** 主食材タグ。例: "魚", "肉", "麺", "つまみ・副菜"。トップフィルタに使用 */
+  main_ingredient_tag: MainIngredientTag | null;
+  /** 発祥国タグ。絵文字+国名。例: "🇯🇵日本", "🇨🇳中国" */
+  country_tag: string | null;
   /** 例: ["高タンパク", "良質脂質"] */
   nutrition_tags: string[];
   created_at: string;

@@ -73,8 +73,8 @@ function buildPayload(
     image_url: imageUrl,
     source_tag,
     source_url: draft.source_url ?? null,
-    scene: draft.scene ?? null,
-    genre_tags: draft.genre_tags ?? [],
+    main_ingredient_tag: draft.main_ingredient_tag ?? null,
+    country_tag: draft.country_tag ?? null,
     nutrition_tags: draft.nutrition_tags ?? [],
   };
 }

@@ -1,7 +1,7 @@
 import type {
   RecipeIngredient,
   RecipeSourceTag,
-  RecipeScene,
+  MainIngredientTag,
   IngredientPairing,
   IngredientAlternative,
 } from "./database";
@@ -36,10 +36,10 @@ export interface DraftRecipe {
   source_url?: string | null;
   /** 既に画像 URL が確定している場合(URL取り込み時の og:image 等)に渡すと、save 時の Unsplash フォールバックをスキップ */
   image_url?: string | null;
-  /** 主食(meal) / つまみ・小腹埋め(snack) */
-  scene: RecipeScene | null;
-  /** 例: ["和食"], ["中華", "夜食"] */
-  genre_tags: string[];
+  /** 主食材タグ。"魚" / "肉" / "麺" / "つまみ・副菜" */
+  main_ingredient_tag: MainIngredientTag | null;
+  /** 発祥国タグ。例: "🇯🇵日本", "🇨🇳中国" */
+  country_tag: string | null;
   /** 例: ["高タンパク", "良質脂質"] */
   nutrition_tags: string[];
   /** 各食材の詳細解説。save 時に ingredient_info テーブルへ upsert */

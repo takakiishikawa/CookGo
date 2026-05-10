@@ -58,8 +58,8 @@ function recipeToDraftWithIngredients(
     source_url: r.source_url,
     image_url: r.image_url,
     ingredients,
-    scene: r.scene,
-    genre_tags: r.genre_tags ?? [],
+    main_ingredient_tag: r.main_ingredient_tag,
+    country_tag: r.country_tag,
     nutrition_tags: r.nutrition_tags ?? [],
   };
 }

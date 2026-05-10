@@ -3,7 +3,7 @@ import { CLAUDE_HAIKU } from "./constants";
 import type { DraftRecipe, IngredientInfoDraft } from "@/types/api";
 import type {
   RecipeIngredient,
-  RecipeScene,
+  MainIngredientTag,
   IngredientPairing,
   IngredientAlternative,
 } from "@/types/database";
@@ -17,8 +17,8 @@ export const SCHEMA_SAMPLE = `{
   "description": "1〜2文の説明",
   "prep_time_min": 20,
   "servings": 1,
-  "scene": "meal",
-  "genre_tags": ["和食"],
+  "main_ingredient_tag": "肉",
+  "country_tag": "🇯🇵日本",
   "nutrition_tags": ["🥩 高タンパク", "💊 ビタミンB豊富"],
   "ingredients": [
     { "name": "豚ロース", "amount": "150", "unit": "g", "category": "protein" },
@@ -63,8 +63,12 @@ export const FIXED_CONSTRAINTS = `【固定条件（最優先・必ず守る）�
 - 食材は具体的に種目まで（例：「肉」ではなく「豚バラ肉」「鶏もも肉」など）
 - ingredients[*].unit は数値量のときは "g" / "ml" など。"大さじ2" のように amount に単位が含まれる場合は空文字 ""
 - name_en / name_vi はサーバー側で後から自動付与するため出力不要（出力しても無視される）
-- scene は必須。"meal"(昼夜の主たる食事) か "snack"(つまみ・小腹埋め) のどちらか
-- genre_tags は 1〜3 個。"和食" / "中華" / "多国籍" / "夜食" のいずれかから選ぶ(複数可)
+- main_ingredient_tag は必須。次の 4 種から 1 つだけ選ぶ:
+  - "魚" : 魚介類が主役
+  - "肉" : 鶏豚牛などの獣肉が主役
+  - "麺" : 麺類が主役
+  - "つまみ・副菜" : 上記に当てはまらない、または小皿/酒のあて
+- country_tag は必須。発祥国を絵文字フラグ + 国名(日本語)で出力。例: "🇯🇵日本" / "🇨🇳中国" / "🇰🇷韓国" / "🇹🇭タイ" / "🇻🇳ベトナム" / "🇮🇹イタリア" / "🇫🇷フランス" / "🇲🇽メキシコ" / "🇮🇳インド" / "🇺🇸アメリカ"。多国籍融合料理で迷ったら、最も近い 1 国を選ぶ
 - nutrition_tags は 2〜3 個。先頭に絵文字を付ける。例: "🥩 高タンパク" / "🟫 炭水化物中心" / "🌿 食物繊維豊富" / "💊 ビタミンB豊富" / "🪨 マグネシウム豊富" / "🥑 良質脂質"。範囲外でも適切なら可
 - ingredient_info は ingredients と同数(=各食材につき必ず1件)。各オブジェクトのフィールドは:
   - name: 対応する ingredients[*].name と完全一致
@@ -85,8 +89,8 @@ export interface RawDraft {
   meal_prep_days?: unknown;
   servings?: unknown;
   ingredients?: unknown;
-  scene?: unknown;
-  genre_tags?: unknown;
+  main_ingredient_tag?: unknown;
+  country_tag?: unknown;
   nutrition_tags?: unknown;
   ingredient_info?: unknown;
 }
@@ -130,8 +134,23 @@ function normalizeStringArray(raw: unknown, max: number): string[] {
   return out;
 }
 
-function normalizeScene(raw: unknown): RecipeScene | null {
-  return raw === "meal" || raw === "snack" ? raw : null;
+const VALID_MAIN_TAGS: ReadonlySet<string> = new Set([
+  "魚",
+  "肉",
+  "麺",
+  "つまみ・副菜",
+]);
+
+function normalizeMainIngredient(raw: unknown): MainIngredientTag | null {
+  return typeof raw === "string" && VALID_MAIN_TAGS.has(raw)
+    ? (raw as MainIngredientTag)
+    : null;
+}
+
+function normalizeCountryTag(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const t = raw.trim();
+  return t.length > 0 ? t : null;
 }
 
 function normalizePairings(raw: unknown): IngredientPairing[] {
@@ -205,8 +224,8 @@ export function normalizeDraft(raw: RawDraft): DraftRecipe | null {
     meal_prep_days: asNumber(raw.meal_prep_days),
     servings: asNumber(raw.servings) ?? 1,
     ingredients,
-    scene: normalizeScene(raw.scene),
-    genre_tags: normalizeStringArray(raw.genre_tags, 3),
+    main_ingredient_tag: normalizeMainIngredient(raw.main_ingredient_tag),
+    country_tag: normalizeCountryTag(raw.country_tag),
     nutrition_tags: normalizeStringArray(raw.nutrition_tags, 4),
     ingredient_info,
   };

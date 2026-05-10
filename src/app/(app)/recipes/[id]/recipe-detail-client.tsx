@@ -17,6 +17,7 @@ import { Badge, Button, toast } from "@takaki/go-design-system";
 import type { Recipe } from "@/types/database";
 import { createClient } from "@/lib/supabase/client";
 import { DB_SCHEMA } from "@/lib/constants";
+import { extractCountryFlag } from "@/lib/utils";
 
 interface RecipeDetailClientProps {
   recipe: Recipe;
@@ -33,6 +34,7 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
   const [uploading, setUploading] = useState(false);
 
   const youtubeSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(recipe.title + " 作り方")}`;
+  const flag = extractCountryFlag(recipe.country_tag);
 
   const deleteRecipe = async () => {
     if (!confirm(`「${recipe.title}」を削除しますか?`)) return;
@@ -160,6 +162,7 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
           </div>
           <div className="flex-1 min-w-0 space-y-2">
             <h1 className="text-2xl md:text-3xl font-semibold leading-tight">
+              {flag && <span className="mr-1.5">{flag}</span>}
               {recipe.title}
             </h1>
             {recipe.description && (
@@ -169,6 +172,22 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
             )}
           </div>
         </div>
+
+        {/* ===== 分類タグ (発祥国 + 主食材) ===== */}
+        {(recipe.country_tag || recipe.main_ingredient_tag) && (
+          <div className="flex flex-wrap gap-1.5">
+            {recipe.country_tag && (
+              <Badge variant="outline" className="text-xs font-normal">
+                {recipe.country_tag}
+              </Badge>
+            )}
+            {recipe.main_ingredient_tag && (
+              <Badge variant="outline" className="text-xs font-normal">
+                {recipe.main_ingredient_tag}
+              </Badge>
+            )}
+          </div>
+        )}
 
         {/* ===== 栄養プロファイルタグ ===== */}
         {recipe.nutrition_tags && recipe.nutrition_tags.length > 0 && (

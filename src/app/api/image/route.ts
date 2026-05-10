@@ -34,6 +34,14 @@ function stripParenSuffix(s: string): string {
     .trim();
 }
 
+const CATEGORY_FALLBACKS: Record<string, string> = {
+  protein: "raw meat fish supermarket",
+  vegetable: "fresh vegetables produce supermarket",
+  carb: "rice noodles pasta package",
+  seasoning: "condiment bottle supermarket shelf",
+  other: "grocery food package",
+};
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const rawQuery = searchParams.get("query")?.trim();
@@ -42,14 +50,19 @@ export async function GET(request: Request) {
 
   // ベースクエリ（括弧除去後）。空になったら元の文字列にフォールバック
   const query = stripParenSuffix(rawQuery) || rawQuery;
+  const context = searchParams.get("context"); // "supermarket" | null
+  const category = searchParams.get("category"); // protein/vegetable/carb/seasoning/other
 
   const seedRaw = searchParams.get("seed");
   const seed = seedRaw ? Math.max(1, Math.min(50, Number(seedRaw) || 1)) : 1;
   const useCache = seed === 1;
 
+  // キャッシュキーには context を含める(同じ食材でも文脈で別画像が欲しいため)
+  const cacheKey = context ? `${context}:${query}` : query;
+
   const now = Date.now();
   if (useCache) {
-    const cached = CACHE[query];
+    const cached = CACHE[cacheKey];
     if (cached && cached.expires > now) {
       return NextResponse.json({
         imageUrl: cached.url,
@@ -60,6 +73,18 @@ export async function GET(request: Request) {
   // Try multiple Unsplash variants for better food/ingredient hits
   const isJapanese = /[ぁ-んァ-ヴー一-龠]/.test(query);
   const variants: string[] = [];
+
+  // 買い物リスト用: スーパー店頭で探す/見せる用途のため、商品パッケージ寄りを優先
+  if (context === "supermarket") {
+    if (isJapanese) {
+      variants.push(`${query} スーパー パック`);
+      variants.push(`${query} 商品 パッケージ`);
+    } else {
+      variants.push(`${query} supermarket package`);
+      variants.push(`${query} grocery store product`);
+    }
+  }
+
   if (isJapanese) {
     variants.push(`${query} food`);
     variants.push(query);
@@ -72,7 +97,7 @@ export async function GET(request: Request) {
   for (const v of variants) {
     const url = await fetchUnsplashImage(v, seed);
     if (url) {
-      if (useCache) CACHE[query] = { url, expires: now + TTL_MS };
+      if (useCache) CACHE[cacheKey] = { url, expires: now + TTL_MS };
       return NextResponse.json({ imageUrl: url } satisfies ImageResponse);
     }
   }
@@ -80,10 +105,20 @@ export async function GET(request: Request) {
   // Wikipedia fallback (seed の影響なし)
   const wiki = await fetchWikipediaImage(query);
   if (wiki) {
-    if (useCache) CACHE[query] = { url: wiki, expires: now + TTL_MS };
+    if (useCache) CACHE[cacheKey] = { url: wiki, expires: now + TTL_MS };
     return NextResponse.json({ imageUrl: wiki } satisfies ImageResponse);
   }
 
-  console.warn("image not found", { query, seed });
+  // カテゴリ代表画像へフォールバック(空白や壊れアイコンを出さないため)
+  if (category && CATEGORY_FALLBACKS[category]) {
+    const catUrl = await fetchUnsplashImage(CATEGORY_FALLBACKS[category], seed);
+    if (catUrl) {
+      // カテゴリ画像はクエリに紐付けてキャッシュしてしまうと別食材で誤再利用されるため
+      // キャッシュ対象外
+      return NextResponse.json({ imageUrl: catUrl } satisfies ImageResponse);
+    }
+  }
+
+  console.warn("image not found", { query, seed, context, category });
   return NextResponse.json({ imageUrl: null } satisfies ImageResponse);
 }

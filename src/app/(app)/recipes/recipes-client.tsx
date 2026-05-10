@@ -10,6 +10,7 @@ import { AddRecipeDialog } from "@/components/recipe/add-recipe-dialog";
 import { StaplesPopup } from "@/components/staples/staples-popup";
 import { InventoryPopup } from "@/components/inventory/inventory-popup";
 import type { InventoryItem, Recipe, Staple } from "@/types/database";
+import { extractCountryFlag } from "@/lib/utils";
 
 function GalleryTile({
   recipe,
@@ -18,6 +19,7 @@ function GalleryTile({
   recipe: Recipe;
   priority: boolean;
 }) {
+  const flag = extractCountryFlag(recipe.country_tag);
   return (
     <Link
       href={`/recipes/${recipe.id}`}
@@ -44,6 +46,7 @@ function GalleryTile({
         {/* タイトル: モバイルは常時控えめ、PC はホバー時にだけ表示 */}
         <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/65 via-black/20 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
           <p className="text-white text-sm font-medium leading-tight line-clamp-2 drop-shadow-sm">
+            {flag && <span className="mr-1">{flag}</span>}
             {recipe.title}
           </p>
         </div>
