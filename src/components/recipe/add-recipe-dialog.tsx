@@ -166,7 +166,103 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
   };
 
   // -----------------------------------------------------------------------
-  // 取り込んでそのまま保存 → 詳細ページへ遷移
+  // 複数 URL の一括取り込み(URL タブの送信時に使用)
+  // -----------------------------------------------------------------------
+  const importAndSaveMany = async (urls: string[]) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    // 1 件あたり 90 秒を確保
+    const timeout = setTimeout(
+      () => controller.abort(),
+      Math.max(IMPORT_TIMEOUT_MS, urls.length * 90_000),
+    );
+
+    setBusy(true);
+    setStep("loading");
+    stopStageMessages();
+    setStageMessages([
+      `${urls.length} 件のレシピを取り込んでいます…`,
+    ]);
+    setStageIndex(0);
+
+    let success = 0;
+    let failure = 0;
+    let aborted = false;
+
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i];
+      setStageMessages([
+        `${i + 1} / ${urls.length} 件目を取り込んでいます…`,
+      ]);
+      setStageIndex(0);
+      try {
+        const importRes = await fetch("/api/recipes/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+          signal: controller.signal,
+        });
+        if (importRes.status === 422) {
+          // 一括時はテキスト貼り付けフォールバックは不可。失敗としてスキップ
+          failure++;
+          continue;
+        }
+        const importData = await importRes.json();
+        if (importData.error) throw new Error(importData.error);
+        const draft = importData.draft as DraftRecipe;
+
+        setStageMessages([
+          `${i + 1} / ${urls.length} 件目を保存しています…`,
+        ]);
+        const saveRes = await fetch("/api/recipes/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipe: draft,
+            source_tag: draft.source_tag ?? "ai_suggest",
+          }),
+          signal: controller.signal,
+        });
+        const saveData = await saveRes.json();
+        if (saveData.error) throw new Error(saveData.error);
+        success++;
+      } catch (err) {
+        const isAbort = err instanceof DOMException && err.name === "AbortError";
+        if (isAbort) {
+          aborted = true;
+          break;
+        }
+        console.error("import failed for", url, err);
+        failure++;
+      }
+    }
+
+    clearTimeout(timeout);
+    stopStageMessages();
+    setBusy(false);
+
+    if (aborted) {
+      toast.error("時間がかかりすぎたため中断しました");
+    }
+    if (success > 0) {
+      toast.success(`${success} 件のレシピを登録しました`);
+    }
+    if (failure > 0) {
+      toast.warning(`${failure} 件は取り込めませんでした`);
+    }
+
+    if (success > 0) {
+      onOpenChange(false);
+      router.push("/recipes");
+      router.refresh();
+    } else {
+      setStep("input");
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // 単発の取り込み(推薦カードクリック / テキスト貼り付け 用)
   // -----------------------------------------------------------------------
   const importAndSave = async (body: {
     url?: string;
@@ -277,21 +373,33 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
             <TabsContent value="url" className="mt-4 space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="recipe-url">レシピの URL</Label>
-                <Input
+                <Textarea
                   id="recipe-url"
-                  type="url"
+                  rows={4}
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
-                  placeholder="https://..."
+                  placeholder={"https://...\nhttps://...\n複数貼れば個別レシピで一括登録"}
                   disabled={busy}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") importAndSave({ url: urlInput });
-                  }}
+                  className="font-mono text-xs"
                 />
               </div>
               <DialogFooter className="pt-1">
                 <Button
-                  onClick={() => importAndSave({ url: urlInput })}
+                  onClick={() => {
+                    const urls = urlInput
+                      .split(/\n+/)
+                      .map((s) => s.trim())
+                      .filter((s) => /^https?:\/\//i.test(s));
+                    if (urls.length === 0) {
+                      toast.error("URL を入力してください");
+                      return;
+                    }
+                    if (urls.length === 1) {
+                      importAndSave({ url: urls[0] });
+                    } else {
+                      importAndSaveMany(urls);
+                    }
+                  }}
                   disabled={busy || !urlInput.trim()}
                   className="gap-1.5"
                 >
