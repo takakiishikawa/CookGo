@@ -5,6 +5,7 @@ import { DB_SCHEMA } from "@/lib/constants";
 import { fetchRecipeImage } from "@/lib/image-query";
 import { inferCategoryFromName } from "@/lib/ingredient-categories";
 import { translateNames, translateTitle } from "@/lib/translate";
+import { generateIngredientInfo } from "@/lib/ingredient-info-ai";
 import type {
   DraftRecipe,
   IngredientInfoDraft,
@@ -12,6 +13,8 @@ import type {
   RecipeSaveResponse,
 } from "@/types/api";
 import type { RecipeIngredient, RecipeSourceTag } from "@/types/database";
+
+export const maxDuration = 60;
 
 async function enrichIngredients(
   ingredients: RecipeIngredient[],
@@ -114,8 +117,77 @@ async function upsertIngredientInfo(
     .from("ingredient_info")
     .upsert(rows, { onConflict: "name", ignoreDuplicates: true });
   if (error) {
-    // 失敗しても保存自体は続行(辞典は補助情報なのでブロックしない)
     console.warn("ingredient_info upsert failed:", error.message);
+  }
+}
+
+/**
+ * レシピの全食材について、まだ DB に存在しない ingredient_info を Sonnet で並列生成して
+ * upsert する。これで食材ポップアップは常に即時表示できる。
+ * 失敗してもレシピ保存自体はブロックしない(警告ログのみ)。
+ */
+async function ensureAllIngredientInfo(
+  supabase: SupabaseClient,
+  ingredients: RecipeIngredient[],
+) {
+  const names = Array.from(
+    new Set(
+      ingredients
+        .map((i) => i.name?.trim())
+        .filter((n): n is string => !!n),
+    ),
+  );
+  if (names.length === 0) return;
+
+  const { data: existing } = await supabase
+    .schema(DB_SCHEMA)
+    .from("ingredient_info")
+    .select("name")
+    .in("name", names);
+  const have = new Set(
+    ((existing as { name: string }[] | null) ?? []).map((r) => r.name),
+  );
+
+  const missing = ingredients.filter(
+    (i) => i.name && !have.has(i.name.trim()),
+  );
+  if (missing.length === 0) return;
+
+  // 同じ食材名が ingredients 内に重複していたら一つにまとめる
+  const seen = new Set<string>();
+  const uniqueMissing = missing.filter((i) => {
+    const k = i.name.trim();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+
+  const generated = await Promise.allSettled(
+    uniqueMissing.map((ing) =>
+      generateIngredientInfo({
+        name: ing.name,
+        name_en: ing.name_en,
+        name_vi: ing.name_vi,
+        category: ing.category,
+      }),
+    ),
+  );
+
+  const rows = generated
+    .filter(
+      (r): r is PromiseFulfilledResult<NonNullable<Awaited<ReturnType<typeof generateIngredientInfo>>>> =>
+        r.status === "fulfilled" && r.value !== null,
+    )
+    .map((r) => r.value);
+
+  if (rows.length === 0) return;
+
+  const { error } = await supabase
+    .schema(DB_SCHEMA)
+    .from("ingredient_info")
+    .upsert(rows, { onConflict: "name", ignoreDuplicates: true });
+  if (error) {
+    console.warn("ensureAllIngredientInfo upsert failed:", error.message);
   }
 }
 
@@ -167,7 +239,9 @@ export async function POST(request: Request) {
       .single();
     if (error) throw error;
 
+    // AI が同梱した分を先にまとめて保存し、足りない分を Sonnet で並列補完
     await upsertIngredientInfo(supabase, draft.ingredient_info);
+    await ensureAllIngredientInfo(supabase, ingredients);
 
     return NextResponse.json({
       recipe_id: data!.id,
@@ -258,6 +332,7 @@ export async function PUT(request: Request) {
     if (error) throw error;
 
     await upsertIngredientInfo(supabase, draft.ingredient_info);
+    await ensureAllIngredientInfo(supabase, ingredients);
 
     return NextResponse.json({
       recipe_id: id,

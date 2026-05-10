@@ -23,7 +23,6 @@ import {
   getCountryFlag,
   stripEmoji,
 } from "@/lib/recipe-tags";
-import { cn } from "@/lib/utils";
 
 interface RecipeModalProps {
   recipe: Recipe | null;
@@ -55,10 +54,6 @@ export function RecipeModal({
   const youtubeSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
     recipe.title + " 作り方",
   )}`;
-  const hasAnyTag =
-    !!countryName ||
-    !!recipe.main_ingredient_tag ||
-    (recipe.nutrition_tags && recipe.nutrition_tags.length > 0);
 
   const openShoppingList = () => {
     router.push(`/recipes/${recipe.id}/shopping`);
@@ -89,7 +84,7 @@ export function RecipeModal({
             {recipe.title}
           </DialogTitle>
 
-          {hasAnyTag && (
+          {(countryName || recipe.main_ingredient_tag) && (
             <div className="flex flex-wrap gap-1.5">
               {countryName && (
                 <Badge variant="outline" className="gap-1">
@@ -103,7 +98,12 @@ export function RecipeModal({
                   {recipe.main_ingredient_tag}
                 </Badge>
               )}
-              {recipe.nutrition_tags?.map((t, i) => {
+            </div>
+          )}
+
+          {recipe.nutrition_tags && recipe.nutrition_tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {recipe.nutrition_tags.map((t, i) => {
                 const label = stripEmoji(t);
                 if (!label) return null;
                 return (
@@ -115,20 +115,20 @@ export function RecipeModal({
             </div>
           )}
 
-          {/* メインアクション 3 つ(カード行) */}
+          {/* メインアクション 3 つ(shadcn Button + size lg + outline) */}
           <div className="space-y-2 pt-1">
-            <ActionRow
+            <ActionItem
               icon={ShoppingCart}
               label="買い物"
               onClick={openShoppingList}
             />
-            <ActionRow
+            <ActionItem
               icon={Video}
               label="YouTube"
               href={youtubeSearchUrl}
               external
             />
-            <ActionRow
+            <ActionItem
               icon={ExternalLink}
               label="元レシピ"
               href={recipe.source_url ?? undefined}
@@ -155,7 +155,7 @@ export function RecipeModal({
   );
 }
 
-interface ActionRowProps {
+interface ActionItemProps {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   onClick?: () => void;
@@ -164,47 +164,49 @@ interface ActionRowProps {
   disabled?: boolean;
 }
 
-function ActionRow({
+function ActionItem({
   icon: Icon,
   label,
   onClick,
   href,
   external,
   disabled,
-}: ActionRowProps) {
-  const baseClass = cn(
-    "flex items-center gap-3 w-full px-4 py-3 rounded-lg border bg-card text-left transition-colors",
-    disabled
-      ? "opacity-50 pointer-events-none"
-      : "hover:bg-muted hover:border-foreground/20 cursor-pointer",
-  );
-  const content = (
+}: ActionItemProps) {
+  const inner = (
     <>
-      <Icon className="w-5 h-5 text-foreground/80 flex-shrink-0" />
-      <span className="flex-1 font-medium text-sm">{label}</span>
-      <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+      <Icon className="w-5 h-5" />
+      <span className="flex-1 text-left text-base font-medium">{label}</span>
+      <ChevronRight className="w-4 h-4 text-muted-foreground" />
     </>
   );
+
   if (href && !disabled) {
     return (
-      <a
-        href={href}
-        target={external ? "_blank" : undefined}
-        rel={external ? "noopener noreferrer" : undefined}
-        className={baseClass}
+      <Button
+        asChild
+        variant="outline"
+        size="lg"
+        className="w-full justify-start gap-3 h-12"
       >
-        {content}
-      </a>
+        <a
+          href={href}
+          target={external ? "_blank" : undefined}
+          rel={external ? "noopener noreferrer" : undefined}
+        >
+          {inner}
+        </a>
+      </Button>
     );
   }
   return (
-    <button
-      type="button"
+    <Button
+      variant="outline"
+      size="lg"
       onClick={onClick}
       disabled={disabled}
-      className={baseClass}
+      className="w-full justify-start gap-3 h-12"
     >
-      {content}
-    </button>
+      {inner}
+    </Button>
   );
 }

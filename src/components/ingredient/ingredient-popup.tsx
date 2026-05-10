@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import {
-  Apple,
   ArrowLeftRight,
   BookOpen,
   FlaskConical,
@@ -89,7 +88,6 @@ export function IngredientPopup({
           setInfo(cached);
           return;
         }
-        // GET 完了 → 未登録なので AI で生成して保存
         setLoading(false);
         setGenerating(true);
         const generated = await generateInfo(ingredient);
@@ -118,16 +116,22 @@ export function IngredientPopup({
       <DialogContent className="max-w-lg max-h-[88vh] overflow-y-auto">
         {ingredient && (
           <>
-            <div className="space-y-1 pr-6">
+            <div className="space-y-2 pr-6">
               <DialogTitle className="text-2xl font-bold leading-tight">
                 {ingredient.name}
               </DialogTitle>
-              {(ingredient.name_en || ingredient.name_vi) && (
-                <p className="text-sm text-muted-foreground">
-                  {[ingredient.name_en, ingredient.name_vi]
-                    .filter(Boolean)
-                    .join(" / ")}
-                </p>
+              {info?.nutrition_tags && info.nutrition_tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {info.nutrition_tags.map((t, i) => {
+                    const label = stripEmoji(t);
+                    if (!label) return null;
+                    return (
+                      <Badge key={`${t}-${i}`} variant="outline">
+                        {label}
+                      </Badge>
+                    );
+                  })}
+                </div>
               )}
             </div>
 
@@ -189,7 +193,7 @@ export function IngredientPopup({
                           key={i}
                           className="flex flex-wrap items-baseline gap-x-2"
                         >
-                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-muted text-xs font-semibold tabular-nums flex-shrink-0">
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary/15 text-primary text-xs font-bold flex-shrink-0">
                             {i + 1}
                           </span>
                           <span className="font-semibold text-foreground">
@@ -203,21 +207,6 @@ export function IngredientPopup({
                         </li>
                       ))}
                     </ol>
-                  </Section>
-                )}
-                {info.nutrition_tags && info.nutrition_tags.length > 0 && (
-                  <Section icon={Apple} title="栄養">
-                    <div className="flex flex-wrap gap-1.5">
-                      {info.nutrition_tags.map((t, i) => {
-                        const label = stripEmoji(t);
-                        if (!label) return null;
-                        return (
-                          <Badge key={`${t}-${i}`} variant="outline">
-                            {label}
-                          </Badge>
-                        );
-                      })}
-                    </div>
                   </Section>
                 )}
               </div>
@@ -276,9 +265,7 @@ function Section({
       <div className="flex items-center gap-2">
         <Icon className="w-4 h-4 text-primary" />
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        {hint && (
-          <span className="text-xs text-muted-foreground">{hint}</span>
-        )}
+        {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
       </div>
       {children}
     </section>

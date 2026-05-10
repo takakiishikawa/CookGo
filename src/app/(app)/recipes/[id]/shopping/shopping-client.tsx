@@ -277,6 +277,27 @@ export function ShoppingClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkedMap, editMode]);
 
+  // 食材詳細を事前ウォーム(旧レシピでも popup が即時表示されるように)
+  // fire-and-forget。ingredients 配列は state なので変動するが mount 時点のスナップショットで十分
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (seedIngredients.length === 0) return;
+    fetch("/api/ingredients/warm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ingredients: seedIngredients.map((i) => ({
+          name: i.name,
+          name_en: i.name_en,
+          name_vi: i.name_vi,
+          category: i.category,
+        })),
+      }),
+    }).catch(() => {
+      // 失敗しても popup 側で on-demand 生成にフォールバックするので無視
+    });
+  }, []);
+
   const toggleChecked = (i: number) => {
     if (editMode) return;
     setCheckedMap((prev) => ({ ...prev, [i]: !prev[i] }));
@@ -652,14 +673,13 @@ export function ShoppingClient({
 
         {/* 最初に戻すボタン: ユーザー操作のみリセット、在庫由来は維持 */}
         {!editMode && totalCount > 0 && (
-          <div className="pt-4 flex justify-center">
+          <div className="pt-6 mt-2 border-t border-border flex justify-center">
             <Button
               variant="outline"
-              size="sm"
               onClick={resetToInitial}
-              className="gap-1.5 text-muted-foreground"
+              className="gap-1.5 mt-4"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className="w-4 h-4" />
               最初に戻す
             </Button>
           </div>
