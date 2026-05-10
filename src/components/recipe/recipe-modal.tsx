@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import {
+  ChevronRight,
   ExternalLink,
   ShoppingCart,
   Trash2,
@@ -22,6 +23,7 @@ import {
   getCountryFlag,
   stripEmoji,
 } from "@/lib/recipe-tags";
+import { cn } from "@/lib/utils";
 
 interface RecipeModalProps {
   recipe: Recipe | null;
@@ -53,9 +55,12 @@ export function RecipeModal({
   const youtubeSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
     recipe.title + " 作り方",
   )}`;
+  const hasAnyTag =
+    !!countryName ||
+    !!recipe.main_ingredient_tag ||
+    (recipe.nutrition_tags && recipe.nutrition_tags.length > 0);
 
   const openShoppingList = () => {
-    // モーダルは閉じずにそのまま遷移(閉じるアニメで一覧がチラつくのを避ける)
     router.push(`/recipes/${recipe.id}/shopping`);
   };
 
@@ -84,19 +89,11 @@ export function RecipeModal({
             {recipe.title}
           </DialogTitle>
 
-          {recipe.description && (
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {recipe.description}
-            </p>
-          )}
-
-          {(countryName || recipe.main_ingredient_tag) && (
+          {hasAnyTag && (
             <div className="flex flex-wrap gap-1.5">
               {countryName && (
                 <Badge variant="outline" className="gap-1">
-                  {countryFlag ? (
-                    <span aria-hidden>{countryFlag}</span>
-                  ) : null}
+                  {countryFlag && <span aria-hidden>{countryFlag}</span>}
                   {countryName}
                 </Badge>
               )}
@@ -106,12 +103,7 @@ export function RecipeModal({
                   {recipe.main_ingredient_tag}
                 </Badge>
               )}
-            </div>
-          )}
-
-          {recipe.nutrition_tags && recipe.nutrition_tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {recipe.nutrition_tags.map((t, i) => {
+              {recipe.nutrition_tags?.map((t, i) => {
                 const label = stripEmoji(t);
                 if (!label) return null;
                 return (
@@ -123,43 +115,26 @@ export function RecipeModal({
             </div>
           )}
 
-          {/* メインアクション 3 つ(同格・塗りで強調しタグと区別) */}
-          <div className="grid grid-cols-3 gap-2 pt-2">
-            <Button onClick={openShoppingList} className="gap-1.5">
-              <ShoppingCart className="w-4 h-4" />
-              買い物
-            </Button>
-            <Button asChild className="gap-1.5">
-              <a
-                href={youtubeSearchUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Video className="w-4 h-4" />
-                YouTube
-              </a>
-            </Button>
-            <Button
-              asChild
+          {/* メインアクション 3 つ(カード行) */}
+          <div className="space-y-2 pt-1">
+            <ActionRow
+              icon={ShoppingCart}
+              label="買い物"
+              onClick={openShoppingList}
+            />
+            <ActionRow
+              icon={Video}
+              label="YouTube"
+              href={youtubeSearchUrl}
+              external
+            />
+            <ActionRow
+              icon={ExternalLink}
+              label="元レシピ"
+              href={recipe.source_url ?? undefined}
+              external
               disabled={!recipe.source_url}
-              className="gap-1.5"
-            >
-              {recipe.source_url ? (
-                <a
-                  href={recipe.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  元レシピ
-                </a>
-              ) : (
-                <span>
-                  <ExternalLink className="w-4 h-4" />
-                  元レシピ
-                </span>
-              )}
-            </Button>
+            />
           </div>
 
           {/* 削除: 誤タップ防止のため小さく右寄せ */}
@@ -177,5 +152,59 @@ export function RecipeModal({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+interface ActionRowProps {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  onClick?: () => void;
+  href?: string;
+  external?: boolean;
+  disabled?: boolean;
+}
+
+function ActionRow({
+  icon: Icon,
+  label,
+  onClick,
+  href,
+  external,
+  disabled,
+}: ActionRowProps) {
+  const baseClass = cn(
+    "flex items-center gap-3 w-full px-4 py-3 rounded-lg border bg-card text-left transition-colors",
+    disabled
+      ? "opacity-50 pointer-events-none"
+      : "hover:bg-muted hover:border-foreground/20 cursor-pointer",
+  );
+  const content = (
+    <>
+      <Icon className="w-5 h-5 text-foreground/80 flex-shrink-0" />
+      <span className="flex-1 font-medium text-sm">{label}</span>
+      <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+    </>
+  );
+  if (href && !disabled) {
+    return (
+      <a
+        href={href}
+        target={external ? "_blank" : undefined}
+        rel={external ? "noopener noreferrer" : undefined}
+        className={baseClass}
+      >
+        {content}
+      </a>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={baseClass}
+    >
+      {content}
+    </button>
   );
 }
