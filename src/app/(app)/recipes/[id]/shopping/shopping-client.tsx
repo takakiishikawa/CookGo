@@ -58,8 +58,9 @@ function recipeToDraftWithIngredients(
     source_url: r.source_url,
     image_url: r.image_url,
     ingredients,
-    steps: (r.steps ?? []).map((s, i) => ({ ...s, order: s.order ?? i + 1 })),
-    tags: r.tags ?? [],
+    scene: r.scene,
+    genre_tags: r.genre_tags ?? [],
+    nutrition_tags: r.nutrition_tags ?? [],
   };
 }
 

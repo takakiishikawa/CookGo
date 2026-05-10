@@ -1,20 +1,17 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { DB_SCHEMA } from "@/lib/constants";
 import { fetchRecipeImage } from "@/lib/image-query";
 import { inferCategoryFromName } from "@/lib/ingredient-categories";
-import { generateStepImageQueries } from "@/lib/step-image-queries";
 import { translateNames, translateTitle } from "@/lib/translate";
 import type {
   DraftRecipe,
+  IngredientInfoDraft,
   RecipeSaveRequest,
   RecipeSaveResponse,
 } from "@/types/api";
-import type {
-  RecipeIngredient,
-  RecipeSourceTag,
-  RecipeStep,
-} from "@/types/database";
+import type { RecipeIngredient, RecipeSourceTag } from "@/types/database";
 
 async function enrichIngredients(
   ingredients: RecipeIngredient[],
@@ -57,39 +54,12 @@ async function enrichIngredients(
   });
 }
 
-async function enhanceSteps(
+function buildPayload(
   draft: DraftRecipe,
   ingredients: RecipeIngredient[],
-): Promise<RecipeStep[]> {
-  const baseSteps = draft.steps ?? [];
-  if (baseSteps.length === 0) return baseSteps;
-  // 全ステップに既に直接画像 URL がある (= 元 URL から取得済み) 場合は
-  // image_query 生成をスキップしトークン節約
-  const allHaveImages = baseSteps.every(
-    (s) => s.image_url && s.image_url.trim().length > 0,
-  );
-  if (allHaveImages) return baseSteps;
-
-  const queries = await generateStepImageQueries({
-    title: draft.title,
-    title_en: draft.title_en,
-    description: draft.description,
-    ingredients,
-    steps: baseSteps,
-  });
-  return baseSteps.map((s, i) => ({
-    ...s,
-    image_query: queries[i] ?? s.image_query,
-  }));
-}
-
-async function buildPayload(
-  draft: DraftRecipe,
   imageUrl: string | null,
   source_tag: RecipeSourceTag,
 ) {
-  const ingredients = await enrichIngredients(draft.ingredients ?? []);
-  const steps = await enhanceSteps(draft, ingredients);
   return {
     title: draft.title,
     title_en: draft.title_en ?? null,
@@ -99,12 +69,13 @@ async function buildPayload(
     meal_prep_days: null,
     servings: draft.servings ?? 1,
     ingredients,
-    steps,
     ai_generated: source_tag === "ai_suggest",
     image_url: imageUrl,
     source_tag,
     source_url: draft.source_url ?? null,
-    tags: draft.tags ?? [],
+    scene: draft.scene ?? null,
+    genre_tags: draft.genre_tags ?? [],
+    nutrition_tags: draft.nutrition_tags ?? [],
   };
 }
 
@@ -112,6 +83,40 @@ async function ensureTitleEn(draft: DraftRecipe): Promise<string | null> {
   if (draft.title_en?.trim()) return draft.title_en.trim();
   if (!draft.title?.trim()) return null;
   return await translateTitle(draft.title.trim());
+}
+
+/**
+ * AI が生成した食材情報をグローバル ingredient_info テーブルへ upsert。
+ * name は UNIQUE。先に登録された情報を上書きしない方針(ON CONFLICT DO NOTHING 相当)。
+ */
+async function upsertIngredientInfo(
+  supabase: SupabaseClient,
+  infos: IngredientInfoDraft[] | undefined,
+) {
+  if (!infos || infos.length === 0) return;
+  const rows = infos
+    .filter((i) => i.name?.trim())
+    .map((i) => ({
+      name: i.name.trim(),
+      name_en: i.name_en,
+      name_vi: i.name_vi,
+      category: i.category,
+      origin: i.origin,
+      composition: i.composition,
+      taste_profile: i.taste_profile,
+      pairings: i.pairings ?? [],
+      alternatives: i.alternatives ?? [],
+      nutrition_tags: i.nutrition_tags ?? [],
+    }));
+  if (rows.length === 0) return;
+  const { error } = await supabase
+    .schema(DB_SCHEMA)
+    .from("ingredient_info")
+    .upsert(rows, { onConflict: "name", ignoreDuplicates: true });
+  if (error) {
+    // 失敗しても保存自体は続行(辞典は補助情報なのでブロックしない)
+    console.warn("ingredient_info upsert failed:", error.message);
+  }
 }
 
 export async function POST(request: Request) {
@@ -151,27 +156,18 @@ export async function POST(request: Request) {
         ingredients: enrichedDraft.ingredients ?? [],
       }));
 
-    const payload = await buildPayload(enrichedDraft, imageUrl, source_tag);
+    const ingredients = await enrichIngredients(enrichedDraft.ingredients ?? []);
+    const payload = buildPayload(enrichedDraft, ingredients, imageUrl, source_tag);
 
-    const insertWithTags = { user_id: user.id, ...payload };
-    let { data, error } = await supabase
+    const { data, error } = await supabase
       .schema(DB_SCHEMA)
       .from("recipes")
-      .insert(insertWithTags)
+      .insert({ user_id: user.id, ...payload })
       .select("id")
       .single();
-    // tags 列がまだ未追加の場合は除いてリトライ (移行未適用環境向け)
-    if (error && /tags/i.test(error.message ?? "")) {
-      const { tags: _omit, ...withoutTags } = insertWithTags;
-      void _omit;
-      ({ data, error } = await supabase
-        .schema(DB_SCHEMA)
-        .from("recipes")
-        .insert(withoutTags)
-        .select("id")
-        .single());
-    }
     if (error) throw error;
+
+    await upsertIngredientInfo(supabase, draft.ingredient_info);
 
     return NextResponse.json({
       recipe_id: data!.id,
@@ -250,25 +246,18 @@ export async function PUT(request: Request) {
         ? requested
         : ((existing.source_tag as RecipeSourceTag | null) ?? "self");
 
-    const payload = await buildPayload(enrichedDraft, imageUrl, source_tag);
+    const ingredients = await enrichIngredients(enrichedDraft.ingredients ?? []);
+    const payload = buildPayload(enrichedDraft, ingredients, imageUrl, source_tag);
 
-    let { error } = await supabase
+    const { error } = await supabase
       .schema(DB_SCHEMA)
       .from("recipes")
       .update(payload)
       .eq("id", id)
       .eq("user_id", user.id);
-    if (error && /tags/i.test(error.message ?? "")) {
-      const { tags: _omit, ...withoutTags } = payload;
-      void _omit;
-      ({ error } = await supabase
-        .schema(DB_SCHEMA)
-        .from("recipes")
-        .update(withoutTags)
-        .eq("id", id)
-        .eq("user_id", user.id));
-    }
     if (error) throw error;
+
+    await upsertIngredientInfo(supabase, draft.ingredient_info);
 
     return NextResponse.json({
       recipe_id: id,

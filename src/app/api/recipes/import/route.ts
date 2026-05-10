@@ -53,7 +53,6 @@ export async function POST(request: Request) {
     let extractedText = content;
     let sourceUrl: string | null = url || null;
     let thumbnail: string | null = null;
-    let stepImages: string[] = [];
 
     if (url && !content) {
       const fetched = await fetchHtml(url);
@@ -72,7 +71,6 @@ export async function POST(request: Request) {
       }
       const extracted = extractFromHtml(fetched.html);
       thumbnail = extracted.ogImage;
-      stepImages = extracted.stepImages;
 
       if (extracted.jsonLdRecipe) {
         // JSON-LD があれば最優先で渡す（Claude にも JSON 整形を任せる）
@@ -111,7 +109,7 @@ ${FIXED_CONSTRAINTS}
 【追加ルール】
 - 入力に書かれている人数(servings)があればそれを反映、なければ 1
 - ingredients は具体名で、amount/unit はそのまま転記
-- steps は順序通りに整形
+- 元レシピに作り方手順が書かれていても、出力には含めない(調理手順は別途 YouTube/元レシピ URL から参照する設計のため)
 
 最終回答は JSON のみで返してください(コードブロック・説明文不要):
 ${SCHEMA_SAMPLE}`;
@@ -122,15 +120,8 @@ ${SCHEMA_SAMPLE}`;
       throw new Error("レシピを構造化できませんでした");
     }
 
-    // 元 URL のステップ画像を steps[i].image_url に紐付け (あれば)
-    const stepsWithImages = draft.steps.map((s, i) => ({
-      ...s,
-      image_url: stepImages[i]?.trim() || s.image_url || null,
-    }));
-
     const enrichedDraft: DraftRecipe = {
       ...draft,
-      steps: stepsWithImages,
       source_url: sourceUrl,
       source_tag: "ai_suggest",
       // og:image が取れていれば save 時の Unsplash 取得をスキップさせる

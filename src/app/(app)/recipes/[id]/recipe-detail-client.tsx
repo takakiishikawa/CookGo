@@ -1,13 +1,11 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Camera,
   ExternalLink,
-  Pencil,
   RefreshCw,
   ShoppingCart,
   Trash2,
@@ -15,54 +13,10 @@ import {
   Video,
 } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
-import { Badge, Button, Separator, toast } from "@takaki/go-design-system";
-import { Recipe, RecipeIngredient, RecipeStep } from "@/types/database";
-import { StepImage } from "@/components/recipe/step-image";
+import { Badge, Button, toast } from "@takaki/go-design-system";
+import type { Recipe } from "@/types/database";
 import { createClient } from "@/lib/supabase/client";
 import { DB_SCHEMA } from "@/lib/constants";
-import { groupStepsIntoPhases } from "@/lib/step-phases";
-
-/** 「ジャガイモ（ラセット種）」→ ["ジャガイモ（ラセット種）", "ジャガイモ", "ラセット種"] */
-function getIngredientAliases(name: string): string[] {
-  const aliases = new Set<string>();
-  if (name) aliases.add(name);
-  const stripped = name.replace(/[（(].*?[)）]/g, "").trim();
-  if (stripped && stripped !== name && stripped.length >= 2) {
-    aliases.add(stripped);
-  }
-  for (const m of name.matchAll(/[（(](.*?)[)）]/g)) {
-    const inner = m[1].trim();
-    if (inner.length >= 2) aliases.add(inner);
-  }
-  return [...aliases];
-}
-
-/** ステップ本文中で言及されている食材を抽出 */
-function findStepIngredients(
-  text: string,
-  ingredients: RecipeIngredient[],
-): RecipeIngredient[] {
-  if (!text) return [];
-  const withAliases = ingredients
-    .filter((ing) => ing.name)
-    .map((ing) => ({ ing, aliases: getIngredientAliases(ing.name) }));
-  // 最も長いエイリアスを使ってソート (より具体的なマッチを優先)
-  withAliases.sort((a, b) => {
-    const al = Math.max(...a.aliases.map((s) => s.length), 0);
-    const bl = Math.max(...b.aliases.map((s) => s.length), 0);
-    return bl - al;
-  });
-  const seen = new Set<string>();
-  const matched: RecipeIngredient[] = [];
-  for (const { ing, aliases } of withAliases) {
-    if (seen.has(ing.name)) continue;
-    if (aliases.some((a) => text.includes(a))) {
-      matched.push(ing);
-      seen.add(ing.name);
-    }
-  }
-  return matched;
-}
 
 interface RecipeDetailClientProps {
   recipe: Recipe;
@@ -77,22 +31,6 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
 
   const [imageUrl, setImageUrl] = useState<string | null>(recipe.image_url);
   const [uploading, setUploading] = useState(false);
-  const [stepsState, setStepsState] = useState<RecipeStep[]>(() =>
-    [...((recipe.steps as RecipeStep[]) ?? [])].sort(
-      (a, b) => a.order - b.order,
-    ),
-  );
-  const [regeneratingStep, setRegeneratingStep] = useState<number | null>(null);
-
-  const stepPhases = useMemo(
-    () => groupStepsIntoPhases(stepsState),
-    [stepsState],
-  );
-
-  const ingredientsList = useMemo<RecipeIngredient[]>(
-    () => (recipe.ingredients as RecipeIngredient[] | null) ?? [],
-    [recipe.ingredients],
-  );
 
   const youtubeSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(recipe.title + " 作り方")}`;
 
@@ -114,32 +52,6 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
 
   const openShoppingList = () => {
     router.push(`/recipes/${recipe.id}/shopping`);
-  };
-
-  const regenerateOneStepImage = async (stepIndex: number) => {
-    setRegeneratingStep(stepIndex);
-    try {
-      const res = await fetch(
-        `/api/recipes/${recipe.id}/regenerate-step-image`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ stepIndex }),
-        },
-      );
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setStepsState((prev) =>
-        prev.map((s, i) =>
-          i === stepIndex ? { ...s, image_query: data.image_query } : s,
-        ),
-      );
-      toast.success("画像を更新しました");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "更新に失敗しました");
-    } finally {
-      setRegeneratingStep(null);
-    }
   };
 
   const handleFilePicked = async (file: File) => {
@@ -200,8 +112,8 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
         ]}
       />
 
-      <div className="px-4 md:px-8 pt-6 pb-12 space-y-6 max-w-3xl">
-        {/* ===== ヘッダー: 画像 + タイトル + 右側プライマリアクション ===== */}
+      <div className="px-4 md:px-8 pt-6 pb-12 space-y-6 max-w-2xl">
+        {/* ===== 画像 + タイトル + 説明 ===== */}
         <div className="flex gap-4 items-start">
           <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-lg overflow-hidden flex-shrink-0 bg-muted">
             {imageUrl ? (
@@ -250,96 +162,31 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
             <h1 className="text-2xl md:text-3xl font-semibold leading-tight">
               {recipe.title}
             </h1>
-            {recipe.tags && recipe.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {recipe.tags.map((t, i) => (
-                  <Badge
-                    key={`${t}-${i}`}
-                    variant="secondary"
-                    className="text-[10px] font-normal"
-                  >
-                    {t}
-                  </Badge>
-                ))}
-              </div>
-            )}
             {recipe.description && (
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {recipe.description}
               </p>
             )}
           </div>
-          {/* プライマリアクションを右側に縦積み (sm+)、編集/削除は元レシピ直下 */}
-          <div className="hidden sm:flex flex-col gap-1.5 flex-shrink-0">
-            <Button
-              onClick={openShoppingList}
-              className="gap-1.5 justify-start"
-              size="sm"
-            >
-              <ShoppingCart className="w-4 h-4" />
-              買い物
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              asChild
-              className="gap-1.5 justify-start"
-            >
-              <a
-                href={youtubeSearchUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Video className="w-3.5 h-3.5 text-destructive" />
-                YouTube
-              </a>
-            </Button>
-            {recipe.source_url && (
-              <Button
-                variant="outline"
-                size="sm"
-                asChild
-                className="gap-1.5 justify-start"
-              >
-                <a
-                  href={recipe.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  元レシピ
-                </a>
-              </Button>
-            )}
-            <div className="flex justify-end gap-0.5 mt-0.5">
-              <Button
-                size="icon"
-                variant="ghost"
-                asChild
-                aria-label="編集"
-                title="編集"
-                className="w-7 h-7 text-muted-foreground"
-              >
-                <Link href={`/recipes/${recipe.id}/edit`}>
-                  <Pencil className="w-3.5 h-3.5" />
-                </Link>
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={deleteRecipe}
-                aria-label="削除"
-                title="削除"
-                className="w-7 h-7 text-muted-foreground hover:text-destructive"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-          </div>
         </div>
 
-        {/* モバイル用アクション行 (買い物/YouTube/元レシピ + 編集/削除) */}
-        <div className="flex sm:hidden flex-wrap items-center gap-2">
+        {/* ===== 栄養プロファイルタグ ===== */}
+        {recipe.nutrition_tags && recipe.nutrition_tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {recipe.nutrition_tags.map((t, i) => (
+              <Badge
+                key={`${t}-${i}`}
+                variant="secondary"
+                className="text-xs font-normal"
+              >
+                {t}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {/* ===== メインアクション 3 つ + 削除 ===== */}
+        <div className="flex flex-wrap items-center gap-2">
           <Button onClick={openShoppingList} className="gap-1.5" size="sm">
             <ShoppingCart className="w-4 h-4" />
             買い物
@@ -366,106 +213,17 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
               </a>
             </Button>
           )}
-          <div className="ml-auto flex gap-0.5">
-            <Button
-              size="icon"
-              variant="ghost"
-              asChild
-              aria-label="編集"
-              title="編集"
-              className="w-7 h-7 text-muted-foreground"
-            >
-              <Link href={`/recipes/${recipe.id}/edit`}>
-                <Pencil className="w-3.5 h-3.5" />
-              </Link>
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={deleteRecipe}
-              aria-label="削除"
-              title="削除"
-              className="w-7 h-7 text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </Button>
-          </div>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={deleteRecipe}
+            aria-label="削除"
+            title="削除"
+            className="ml-auto w-7 h-7 text-muted-foreground hover:text-destructive"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
         </div>
-
-        <Separator />
-
-        {/* ===== 作り方 (シンプルな縦リスト, 完了状態なし) ===== */}
-        {stepsState.length > 0 && (
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-lg md:text-xl font-bold">作り方</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {stepsState.length}ステップ
-              </p>
-            </div>
-
-            {stepPhases.map((phase, phaseIndex) => (
-              <section key={phaseIndex} className="space-y-4">
-                {phase.name && (
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-muted-foreground tabular-nums">
-                        {phaseIndex + 1} / {stepPhases.length}
-                      </span>
-                      <h3 className="text-base font-semibold">{phase.name}</h3>
-                    </div>
-                    <div className="flex-1 h-px bg-border" />
-                  </div>
-                )}
-                <ol className="space-y-5">
-                  {phase.steps.map((step) => {
-                    const absIndex = stepsState.findIndex(
-                      (s) => s.order === step.order,
-                    );
-                    const stepIngredients = findStepIngredients(
-                      step.text,
-                      ingredientsList,
-                    );
-                    return (
-                      <li key={step.order} className="flex gap-3">
-                        <span className="flex-shrink-0 w-7 h-7 rounded-full bg-primary/10 text-primary text-sm font-bold flex items-center justify-center mt-0.5 tabular-nums">
-                          {step.order}
-                        </span>
-                        <div className="flex-1 min-w-0 space-y-2">
-                          <p className="text-base leading-relaxed">
-                            {step.text}
-                          </p>
-                          {stepIngredients.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5">
-                              {stepIngredients.map((ing, idx) => (
-                                <span
-                                  key={`${ing.name}-${idx}`}
-                                  className="inline-flex items-center px-2.5 py-1 rounded-full bg-muted/60 border border-border text-xs text-foreground/80"
-                                >
-                                  {ing.name}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {(step.image_url || step.image_query) && (
-                            <StepImage
-                              query={step.image_query}
-                              directUrl={step.image_url ?? null}
-                              onRegenerate={() =>
-                                regenerateOneStepImage(absIndex)
-                              }
-                              regenerating={regeneratingStep === absIndex}
-                            />
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
-              </section>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

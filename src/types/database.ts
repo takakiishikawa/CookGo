@@ -7,14 +7,6 @@ export interface RecipeIngredient {
   category: string | null;
 }
 
-export interface RecipeStep {
-  order: number;
-  text: string;
-  image_query: string | null;
-  /** 元 URL のページから抽出した直接画像 URL。設定があれば image_query より優先 */
-  image_url?: string | null;
-}
-
 export type RecipeSourceTag = "self" | "ai_suggest" | "delivery";
 
 export const RECIPE_SOURCE_LABELS: Record<RecipeSourceTag, string> = {
@@ -22,6 +14,32 @@ export const RECIPE_SOURCE_LABELS: Record<RecipeSourceTag, string> = {
   ai_suggest: "AI提案",
   delivery: "宅配",
 };
+
+// ---------------------------------------------------------------------------
+// レシピ分類タグ
+// ---------------------------------------------------------------------------
+
+/** ごはん(主たる食事) / 軽食(つまみ・小腹埋め) */
+export type RecipeScene = "meal" | "snack";
+
+export const RECIPE_SCENE_LABELS: Record<RecipeScene, string> = {
+  meal: "ごはん",
+  snack: "軽食",
+};
+
+/** AI に投げる例示用のジャンル候補。フィルタ UI でも使う初期セット */
+export const RECIPE_GENRE_TAGS = ["和食", "中華", "夜食", "多国籍"] as const;
+export type RecipeGenreTag = (typeof RECIPE_GENRE_TAGS)[number];
+
+/** 栄養プロファイルタグの代表例(AI は範囲外も可) */
+export const NUTRITION_TAG_SUGGESTIONS = [
+  "高タンパク",
+  "炭水化物中心",
+  "食物繊維豊富",
+  "ビタミンB豊富",
+  "マグネシウム豊富",
+  "良質脂質",
+] as const;
 
 export interface Recipe {
   id: string;
@@ -36,11 +54,14 @@ export interface Recipe {
   image_url: string | null;
   source_url: string | null;
   ingredients: RecipeIngredient[] | null;
-  steps: RecipeStep[] | null;
   ai_generated: boolean;
   source_tag: RecipeSourceTag | null;
-  /** 短い特徴タグ (例: ["BONIQ公式", "湯せん低温調理"])。recipes テーブルの tags 列 */
-  tags: string[] | null;
+  /** 主食(meal) か つまみ・小腹埋め(snack) か */
+  scene: RecipeScene | null;
+  /** 例: ["和食"], ["中華", "夜食"] */
+  genre_tags: string[];
+  /** 例: ["高タンパク", "良質脂質"] */
+  nutrition_tags: string[];
   created_at: string;
 }
 
@@ -64,6 +85,51 @@ export const INGREDIENT_CATEGORIES = [
   "炭水化物",
   "その他",
 ] as const;
+
+// ---------------------------------------------------------------------------
+// 食材辞典 (グローバル共有キャッシュ)
+// ---------------------------------------------------------------------------
+
+export interface IngredientPairing {
+  food: string;
+  reason: string;
+}
+
+export interface IngredientAlternative {
+  name: string;
+  reason: string;
+}
+
+export interface IngredientInfo {
+  id: string;
+  name: string;
+  name_en: string | null;
+  name_vi: string | null;
+  category: string | null;
+  origin: string | null;
+  composition: string | null;
+  taste_profile: string | null;
+  pairings: IngredientPairing[];
+  alternatives: IngredientAlternative[];
+  nutrition_tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// 在庫(常備食材)
+// ---------------------------------------------------------------------------
+
+export interface InventoryItem {
+  id: string;
+  user_id: string;
+  name: string;
+  name_en: string | null;
+  name_vi: string | null;
+  category: string | null;
+  sort_order: number;
+  created_at: string;
+}
 
 // ---------------------------------------------------------------------------
 // Body management (PhysicalGo統合)

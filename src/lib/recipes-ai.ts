@@ -1,7 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { CLAUDE_HAIKU } from "./constants";
-import type { DraftRecipe } from "@/types/api";
-import type { RecipeIngredient, RecipeStep } from "@/types/database";
+import type { DraftRecipe, IngredientInfoDraft } from "@/types/api";
+import type {
+  RecipeIngredient,
+  RecipeScene,
+  IngredientPairing,
+  IngredientAlternative,
+} from "@/types/database";
 
 // Vercel 60秒制約に収めるため Haiku を使用(構造化のみで Sonnet は不要)
 const anthropic = new Anthropic({ maxRetries: 0 });
@@ -12,24 +17,42 @@ export const SCHEMA_SAMPLE = `{
   "description": "1〜2文の説明",
   "prep_time_min": 20,
   "servings": 1,
-  "tags": ["定番和食", "フライパン1つ", "ご飯泥棒"],
+  "scene": "meal",
+  "genre_tags": ["和食"],
+  "nutrition_tags": ["🥩 高タンパク", "💊 ビタミンB豊富"],
   "ingredients": [
+    { "name": "豚ロース", "amount": "150", "unit": "g", "category": "protein" },
+    { "name": "醤油", "amount": "大さじ2", "unit": "", "category": "seasoning" }
+  ],
+  "ingredient_info": [
     {
       "name": "豚ロース",
-      "amount": "150",
-      "unit": "g",
-      "category": "protein"
+      "category": "protein",
+      "origin": "豚の背中側にある肉。明治期に英語の loin を音訳して『ロース』になった。",
+      "composition": "豚の背中中央の筋肉。脂身が薄く層になり、加熱するとほぐれて柔らかくなる。",
+      "taste_profile": "脂の甘みと淡白な肉の旨味。脂が口の中で溶けて広がるため、しっとり感じる。",
+      "pairings": [
+        { "food": "生姜", "reason": "豚特有の臭みを抑え、脂の重さを引き締める" }
+      ],
+      "alternatives": [
+        { "name": "鶏もも肉", "reason": "脂身の甘みが似ていて代用しやすい" }
+      ],
+      "nutrition_tags": ["🥩 高タンパク", "💊 ビタミンB豊富"]
     },
     {
       "name": "醤油",
-      "amount": "大さじ2",
-      "unit": "",
-      "category": "seasoning"
+      "category": "seasoning",
+      "origin": "古代中国の『醤(ジャン)』が日本に伝わり、麹で発酵させた液体調味料として独自進化した。",
+      "composition": "大豆と小麦を麹菌で発酵させ、塩水で半年〜2年熟成して搾った液体。",
+      "taste_profile": "塩味と旨味(グルタミン酸)、発酵由来の香ばしさ。アミノ酸が舌の旨味受容体を強く刺激する。",
+      "pairings": [
+        { "food": "みりん", "reason": "甘みが塩角を丸め、テリと深みを出す" }
+      ],
+      "alternatives": [
+        { "name": "ナンプラー", "reason": "ホーチミンで入手しやすく、塩味と旨味の系統が近い" }
+      ],
+      "nutrition_tags": []
     }
-  ],
-  "steps": [
-    { "order": 1, "text": "豚肉を一口大に切る", "image_query": "slicing pork loin" },
-    { "order": 2, "text": "フライパンで両面焼く", "image_query": "pan frying pork" }
   ]
 }`;
 
@@ -40,8 +63,18 @@ export const FIXED_CONSTRAINTS = `【固定条件（最優先・必ず守る）�
 - 食材は具体的に種目まで（例：「肉」ではなく「豚バラ肉」「鶏もも肉」など）
 - ingredients[*].unit は数値量のときは "g" / "ml" など。"大さじ2" のように amount に単位が含まれる場合は空文字 ""
 - name_en / name_vi はサーバー側で後から自動付与するため出力不要（出力しても無視される）
-- steps[*].image_query は 各調理過程の写真検索用に英語で具体的に書く（必須・各ステップ毎に）
-- tags は短い特徴タグ 2〜4 個 (各 8 文字以内程度) で、調理時間 / 主材料 / 調理法 / シーン / 特殊技法 等から拾う。「美味しい」「簡単」など曖昧で全レシピに当てはまる語は禁止。例: ["30分以内", "作り置き向き", "鶏胸肉メイン"], ["低温調理", "BONIQ公式", "本格派"]`;
+- scene は必須。"meal"(昼夜の主たる食事) か "snack"(つまみ・小腹埋め) のどちらか
+- genre_tags は 1〜3 個。"和食" / "中華" / "多国籍" / "夜食" のいずれかから選ぶ(複数可)
+- nutrition_tags は 2〜3 個。先頭に絵文字を付ける。例: "🥩 高タンパク" / "🟫 炭水化物中心" / "🌿 食物繊維豊富" / "💊 ビタミンB豊富" / "🪨 マグネシウム豊富" / "🥑 良質脂質"。範囲外でも適切なら可
+- ingredient_info は ingredients と同数(=各食材につき必ず1件)。各オブジェクトのフィールドは:
+  - name: 対応する ingredients[*].name と完全一致
+  - category: ingredients[*].category と同じ値
+  - origin: 名前の由来(1〜2文)
+  - composition: 何でできているか・どう作られているか(2〜3文。素人にわかる表現で)
+  - taste_profile: 感じる味と、なぜそう感じるかの仕組み(1〜2文)
+  - pairings: 相性のいい食材 1〜3 個。各 { food, reason } で reason は端的に1文
+  - alternatives: 代替品 1〜3 個。ホーチミンで入手しやすい順。各 { name, reason }
+  - nutrition_tags: 食材単位での栄養特徴 0〜3 個(レシピ全体の nutrition_tags と同じ表記体系)`;
 
 export interface RawDraft {
   title?: unknown;
@@ -52,8 +85,10 @@ export interface RawDraft {
   meal_prep_days?: unknown;
   servings?: unknown;
   ingredients?: unknown;
-  steps?: unknown;
-  tags?: unknown;
+  scene?: unknown;
+  genre_tags?: unknown;
+  nutrition_tags?: unknown;
+  ingredient_info?: unknown;
 }
 
 function asString(v: unknown): string | null {
@@ -81,29 +116,71 @@ function normalizeIngredient(raw: unknown): RecipeIngredient | null {
   };
 }
 
-function normalizeStep(raw: unknown): RecipeStep | null {
-  if (!raw || typeof raw !== "object") return null;
-  const r = raw as Record<string, unknown>;
-  const text = asString(r.text);
-  if (!text) return null;
-  return {
-    order: asNumber(r.order) ?? 0,
-    text,
-    image_query: asString(r.image_query),
-    image_url: asString(r.image_url),
-  };
-}
-
-function normalizeTags(raw: unknown): string[] {
+function normalizeStringArray(raw: unknown, max: number): string[] {
   if (!Array.isArray(raw)) return [];
   const out: string[] = [];
   for (const v of raw) {
     if (typeof v !== "string") continue;
     const t = v.trim();
-    if (t.length > 0) out.push(t);
-    if (out.length >= 6) break;
+    if (t.length === 0) continue;
+    if (out.includes(t)) continue;
+    out.push(t);
+    if (out.length >= max) break;
   }
   return out;
+}
+
+function normalizeScene(raw: unknown): RecipeScene | null {
+  return raw === "meal" || raw === "snack" ? raw : null;
+}
+
+function normalizePairings(raw: unknown): IngredientPairing[] {
+  if (!Array.isArray(raw)) return [];
+  const out: IngredientPairing[] = [];
+  for (const r of raw) {
+    if (!r || typeof r !== "object") continue;
+    const obj = r as Record<string, unknown>;
+    const food = asString(obj.food);
+    if (!food) continue;
+    const reason = asString(obj.reason) ?? "";
+    out.push({ food, reason });
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+
+function normalizeAlternatives(raw: unknown): IngredientAlternative[] {
+  if (!Array.isArray(raw)) return [];
+  const out: IngredientAlternative[] = [];
+  for (const r of raw) {
+    if (!r || typeof r !== "object") continue;
+    const obj = r as Record<string, unknown>;
+    const name = asString(obj.name);
+    if (!name) continue;
+    const reason = asString(obj.reason) ?? "";
+    out.push({ name, reason });
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+function normalizeIngredientInfo(raw: unknown): IngredientInfoDraft | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const name = asString(r.name);
+  if (!name) return null;
+  return {
+    name,
+    name_en: asString(r.name_en),
+    name_vi: asString(r.name_vi),
+    category: asString(r.category),
+    origin: asString(r.origin),
+    composition: asString(r.composition),
+    taste_profile: asString(r.taste_profile),
+    pairings: normalizePairings(r.pairings),
+    alternatives: normalizeAlternatives(r.alternatives),
+    nutrition_tags: normalizeStringArray(r.nutrition_tags, 5),
+  };
 }
 
 export function normalizeDraft(raw: RawDraft): DraftRecipe | null {
@@ -114,8 +191,10 @@ export function normalizeDraft(raw: RawDraft): DraftRecipe | null {
         .map(normalizeIngredient)
         .filter((i): i is RecipeIngredient => i !== null)
     : [];
-  const steps = Array.isArray(raw.steps)
-    ? raw.steps.map(normalizeStep).filter((s): s is RecipeStep => s !== null)
+  const ingredient_info = Array.isArray(raw.ingredient_info)
+    ? raw.ingredient_info
+        .map(normalizeIngredientInfo)
+        .filter((i): i is IngredientInfoDraft => i !== null)
     : [];
   return {
     title,
@@ -126,15 +205,17 @@ export function normalizeDraft(raw: RawDraft): DraftRecipe | null {
     meal_prep_days: asNumber(raw.meal_prep_days),
     servings: asNumber(raw.servings) ?? 1,
     ingredients,
-    steps,
-    tags: normalizeTags(raw.tags),
+    scene: normalizeScene(raw.scene),
+    genre_tags: normalizeStringArray(raw.genre_tags, 3),
+    nutrition_tags: normalizeStringArray(raw.nutrition_tags, 4),
+    ingredient_info,
   };
 }
 
 export async function callClaudeJson(prompt: string): Promise<unknown> {
   const response = await anthropic.messages.create({
     model: CLAUDE_HAIKU,
-    max_tokens: 4096,
+    max_tokens: 8192,
     messages: [{ role: "user", content: prompt }],
   });
   const text =
