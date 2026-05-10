@@ -130,35 +130,32 @@ export function RecipesClient({
       <AppHeader />
 
       <div className="px-4 md:px-8 pt-6 pb-12 space-y-6 max-w-6xl">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold leading-tight">レシピ</h1>
-          <div className="flex items-center gap-2">
-            <Button
-              size="icon"
-              variant="outline"
-              onClick={() => setInventoryOpen(true)}
-              aria-label="在庫を開く"
-              title="在庫"
-            >
-              <Package className="w-4 h-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="outline"
-              onClick={() => setStaplesOpen(true)}
-              aria-label="定番を開く"
-              title="定番"
-            >
-              <ShoppingBasket className="w-4 h-4" />
-            </Button>
-            <Button
-              size="icon"
-              onClick={() => setAddOpen(true)}
-              aria-label="レシピを追加"
-            >
-              <Plus className="w-4 h-4" />
-            </Button>
-          </div>
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            size="icon"
+            variant="outline"
+            onClick={() => setInventoryOpen(true)}
+            aria-label="在庫を開く"
+            title="在庫"
+          >
+            <Package className="w-4 h-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="outline"
+            onClick={() => setStaplesOpen(true)}
+            aria-label="定番を開く"
+            title="定番"
+          >
+            <ShoppingBasket className="w-4 h-4" />
+          </Button>
+          <Button
+            size="icon"
+            onClick={() => setAddOpen(true)}
+            aria-label="レシピを追加"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
         </div>
 
         {/* 主食材タグフィルタ (横スクロール、単一選択) */}
