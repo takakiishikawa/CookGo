@@ -76,6 +76,7 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
   );
 
   const [urlInput, setUrlInput] = useState("");
+  const [loadingCount, setLoadingCount] = useState(0);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [pasteText, setPasteText] = useState("");
   const [aiQuery, setAiQuery] = useState("");
@@ -99,8 +100,23 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
       setPendingUrl(null);
       setRecommendations([]);
       setMode("url");
+      setLoadingCount(0);
     }
   }, [open]);
+
+  const durationLabel = (count: number): string => {
+    const minSec = Math.max(1, count) * 20;
+    const maxSec = Math.max(1, count) * 40;
+    if (maxSec < 90) {
+      return `完了までに ${minSec}〜${maxSec} 秒ほどかかります`;
+    }
+    const minMin = Math.ceil(minSec / 60);
+    const maxMin = Math.ceil(maxSec / 60);
+    if (minMin === maxMin) {
+      return `完了までに 約 ${minMin} 分かかります`;
+    }
+    return `完了までに ${minMin}〜${maxMin} 分ほどかかります`;
+  };
 
   const startStageMessages = (messages: string[]) => {
     setStageMessages(messages);
@@ -131,6 +147,7 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
     setRecommendations([]);
     setStep("loading");
     setPendingUrl(null);
+    setLoadingCount(1);
     startStageMessages(STAGE_MESSAGES_RECOMMEND);
     try {
       const res = await fetch("/api/recipes/recommend", {
@@ -180,6 +197,7 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
 
     setBusy(true);
     setStep("loading");
+    setLoadingCount(urls.length);
     stopStageMessages();
     setStageMessages([
       `${urls.length} 件のレシピを取り込んでいます…`,
@@ -276,6 +294,7 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
 
     setBusy(true);
     setStep("loading");
+    setLoadingCount(1);
     startStageMessages(STAGE_MESSAGES_IMPORT);
     setPendingUrl(body.url ?? body.sourceUrl ?? null);
 
@@ -408,7 +427,7 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
                   ) : (
                     <Sparkles className="w-4 h-4" />
                   )}
-                  {busy ? "取り込み中..." : "AI に取り込んでもらう"}
+                  {busy ? "生成中..." : "生成する"}
                 </Button>
               </DialogFooter>
             </TabsContent>
@@ -540,7 +559,7 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
                 {stageMessages[stageIndex]}
               </p>
               <p className="text-xs text-muted-foreground">
-                完了までに 20〜40 秒ほどかかります
+                {durationLabel(loadingCount)}
               </p>
             </div>
           </div>
@@ -597,7 +616,7 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
                 ) : (
                   <Sparkles className="w-4 h-4" />
                 )}
-                {busy ? "取り込み中..." : "AI で取り込む"}
+                {busy ? "生成中..." : "生成する"}
               </Button>
             </DialogFooter>
           </div>
