@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { Package, Plus, ShoppingBasket, UtensilsCrossed } from "lucide-react";
 import { Button, EmptyState } from "@takaki/go-design-system";
 import { AppHeader } from "@/components/layout/app-header";
 import { AddRecipeDialog } from "@/components/recipe/add-recipe-dialog";
+import { RecipeModal } from "@/components/recipe/recipe-modal";
 import { StaplesPopup } from "@/components/staples/staples-popup";
 import { InventoryPopup } from "@/components/inventory/inventory-popup";
 import {
@@ -48,15 +48,18 @@ function FilterChip({
 function GalleryTile({
   recipe,
   priority,
+  onOpen,
 }: {
   recipe: Recipe;
   priority: boolean;
+  onOpen: (recipe: Recipe) => void;
 }) {
   const flag = extractCountryFlag(recipe.country_tag);
   return (
-    <Link
-      href={`/recipes/${recipe.id}`}
-      className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl"
+    <button
+      type="button"
+      onClick={() => onOpen(recipe)}
+      className="group block w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl"
     >
       <div className="relative aspect-square overflow-hidden rounded-xl bg-muted">
         {recipe.image_url ? (
@@ -84,7 +87,7 @@ function GalleryTile({
           </p>
         </div>
       </div>
-    </Link>
+    </button>
   );
 }
 
@@ -104,6 +107,7 @@ export function RecipesClient({
   const [addOpen, setAddOpen] = useState(false);
   const [staplesOpen, setStaplesOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [openRecipe, setOpenRecipe] = useState<Recipe | null>(null);
   const [selectedTags, setSelectedTags] = useState<Set<MainIngredientTag>>(
     () => new Set(),
   );
@@ -205,6 +209,7 @@ export function RecipesClient({
                 key={recipe.id}
                 recipe={recipe}
                 priority={i < 6 /* 上 2 行は優先ロード */}
+                onOpen={setOpenRecipe}
               />
             ))}
           </div>
@@ -223,6 +228,13 @@ export function RecipesClient({
         onOpenChange={setInventoryOpen}
         initialItems={inventory}
         userId={userId}
+      />
+      <RecipeModal
+        recipe={openRecipe}
+        onOpenChange={(o) => {
+          if (!o) setOpenRecipe(null);
+        }}
+        onDeleted={() => setOpenRecipe(null)}
       />
     </div>
   );

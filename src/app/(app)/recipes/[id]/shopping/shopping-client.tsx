@@ -475,10 +475,7 @@ export function ShoppingClient({
       <AppHeader
         breadcrumbs={[
           { label: "レシピ", href: "/recipes" },
-          {
-            label: recipe.title,
-            href: `/recipes/${recipe.id}`,
-          },
+          { label: recipe.title },
           { label: "買い物" },
         ]}
       />
