@@ -1,12 +1,12 @@
 /**
  * POST /api/ingredients/generate
- *   食材辞典に未登録の食材を Claude で生成し、ingredient_info テーブルへ upsert。
+ *   食材辞典に未登録の食材を Claude Sonnet で生成し、ingredient_info テーブルへ upsert。
  *   既存があればそれを返却(=AI を呼ばない)。
  */
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { CLAUDE_HAIKU, DB_SCHEMA } from "@/lib/constants";
+import { CLAUDE_SONNET, DB_SCHEMA } from "@/lib/constants";
 import type {
   IngredientInfo,
   IngredientPairing,
@@ -22,6 +22,8 @@ interface Body {
   name_en?: string | null;
   name_vi?: string | null;
   category?: string | null;
+  /** true で既存があっても AI で再生成する(リフレッシュ用) */
+  force?: boolean;
 }
 
 function asString(v: unknown): string | null {
@@ -90,18 +92,19 @@ export async function POST(request: Request) {
       );
     }
 
-    // 既存があれば返却
-    const existing = await supabase
-      .schema(DB_SCHEMA)
-      .from("ingredient_info")
-      .select("*")
-      .eq("name", name)
-      .maybeSingle();
-    if (existing.data) {
-      return NextResponse.json({ info: existing.data as IngredientInfo });
+    if (!body.force) {
+      const existing = await supabase
+        .schema(DB_SCHEMA)
+        .from("ingredient_info")
+        .select("*")
+        .eq("name", name)
+        .maybeSingle();
+      if (existing.data) {
+        return NextResponse.json({ info: existing.data as IngredientInfo });
+      }
     }
 
-    const prompt = `日本の家庭料理に関わる食材について、買い物中に「これって何？」と気になった人に向けて短い解説を書いてください。
+    const prompt = `あなたは料理オタクで、食材の魅力を熱く語る案内人です。専門用語を避け、たとえ話や身近な比喩を使い、誰でも「ふーん!おもしろい!」と感じる解説を書いてください。
 
 【対象食材】
 - 名前(日本語): ${name}
@@ -109,14 +112,19 @@ export async function POST(request: Request) {
 - カテゴリ: ${body.category ?? "(不明)"}
 
 【出力ルール】
-- origin: 名前の由来。1〜2 文。
-- composition: 何でできているか・どう作られているか。2〜3 文。「糊化」のような専門用語は使わず、素人向けに書く。
-- taste_profile: 感じる味と、なぜそう感じるかの仕組み。1〜2 文。
-- pairings: 相性のいい食材 1〜3 個。各 { food, reason }。reason は端的に1文。
-- alternatives: 代替品 1〜3 個。ホーチミンのスーパーで入手しやすい順。各 { name, reason }。
-- nutrition_tags: 食材単位での栄養特徴 0〜3 個。先頭に絵文字を付ける(例: "🥩 高タンパク", "🟫 炭水化物中心", "🌿 食物繊維豊富", "💊 ビタミンB豊富", "🪨 マグネシウム豊富", "🥑 良質脂質")。
+- origin: 名前の由来や歴史的トリビア (1〜2 文)。語源、伝来のエピソード、思わず「へぇ〜」と言いたくなる小話。
+- composition: 何でできているか・どう作られているか (2〜3 文)。専門用語(例:「糊化」「変性」)を避け、身近な比喩で書く。
+- taste_profile: 感じる味と、なぜそう感じるかの仕組み (1〜2 文)。舌のどこで何を感じる、口の中でどう広がる、を書くと臨場感が出る。
+- pairings: 相性のいい食材 1〜3 個。各 { food, reason } で、reason は化学的・食感的になぜ合うかを 1 文で。
+- alternatives: 代替品 1〜3 個。ホーチミンの市場やスーパーで手に入りやすい順。各 { name, reason }。
+- nutrition_tags: 食材単位の栄養特徴 0〜3 個。プレーン日本語の短いラベル(絵文字は使わない)。
 
-最終回答は JSON のみで返してください(コードブロック・説明文不要):
+口調:
+- 親しみのある語り口 OK。固い学術調にしない。「〜なんですよ」「〜してくれる存在」のような表現は OK。
+- ただし 1 文は簡潔に。冗長な前置きは入れない。
+- 絵文字・装飾記号は使わない。プレーン日本語のみ。
+
+JSON のみで返答してください(コードブロック・説明文不要):
 {
   "origin": "...",
   "composition": "...",
@@ -127,8 +135,8 @@ export async function POST(request: Request) {
 }`;
 
     const res = await client.messages.create({
-      model: CLAUDE_HAIKU,
-      max_tokens: 1024,
+      model: CLAUDE_SONNET,
+      max_tokens: 2048,
       messages: [{ role: "user", content: prompt }],
     });
     const text = res.content[0]?.type === "text" ? res.content[0].text : "";

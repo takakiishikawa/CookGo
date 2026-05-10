@@ -1,14 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RefreshCw, Sparkles } from "lucide-react";
+import {
+  Apple,
+  ArrowLeftRight,
+  BookOpen,
+  FlaskConical,
+  HeartHandshake,
+  Sparkles,
+  UtensilsCrossed,
+} from "lucide-react";
 import {
   Badge,
-  Button,
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
   DialogTitle,
   toast,
 } from "@takaki/go-design-system";
@@ -57,7 +62,6 @@ export function IngredientPopup({
   onOpenChange,
 }: IngredientPopupProps) {
   const open = ingredient !== null;
-  const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [info, setInfo] = useState<IngredientInfo | null>(null);
 
@@ -67,101 +71,121 @@ export function IngredientPopup({
       return;
     }
     let cancelled = false;
-    setLoading(true);
     setInfo(null);
-    fetchInfo(ingredient.name)
-      .then((data) => {
-        if (!cancelled) setInfo(data);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    setGenerating(false);
+
+    (async () => {
+      // まず DB を引く
+      const cached = await fetchInfo(ingredient.name);
+      if (cancelled) return;
+      if (cached) {
+        setInfo(cached);
+        return;
+      }
+      // 無ければ AI で生成して保存(以後は即時表示される)
+      setGenerating(true);
+      try {
+        const generated = await generateInfo(ingredient);
+        if (!cancelled && generated) setInfo(generated);
+      } catch (err) {
+        if (!cancelled) {
+          toast.error(err instanceof Error ? err.message : "生成に失敗しました");
+        }
+      } finally {
+        if (!cancelled) setGenerating(false);
+      }
+    })();
+
     return () => {
       cancelled = true;
     };
   }, [ingredient]);
 
-  const handleGenerate = async () => {
-    if (!ingredient) return;
-    setGenerating(true);
-    try {
-      const generated = await generateInfo(ingredient);
-      setInfo(generated);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "生成に失敗しました");
-    } finally {
-      setGenerating(false);
-    }
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[88vh] overflow-y-auto">
         {ingredient && (
           <>
-            <DialogHeader>
-              <DialogTitle>{ingredient.name}</DialogTitle>
+            <div className="space-y-1 pr-6">
+              <DialogTitle className="text-2xl font-bold leading-tight">
+                {ingredient.name}
+              </DialogTitle>
               {(ingredient.name_en || ingredient.name_vi) && (
-                <DialogDescription>
+                <p className="text-sm text-muted-foreground">
                   {[ingredient.name_en, ingredient.name_vi]
                     .filter(Boolean)
                     .join(" / ")}
-                </DialogDescription>
+                </p>
               )}
-            </DialogHeader>
+            </div>
 
-            {loading ? (
-              <div className="py-10 flex flex-col items-center gap-3">
-                <RefreshCw className="w-6 h-6 text-primary animate-spin" />
-                <p className="text-sm text-muted-foreground">読み込み中…</p>
-              </div>
+            {generating && !info ? (
+              <GeneratingState name={ingredient.name} />
             ) : info ? (
-              <div className="space-y-5">
+              <div className="mt-4 space-y-5">
                 {info.origin && (
-                  <Section title="名前の由来">
-                    <p className="text-sm leading-relaxed">{info.origin}</p>
+                  <Section icon={BookOpen} title="名前の由来">
+                    <p className="text-sm leading-relaxed text-foreground/90">
+                      {info.origin}
+                    </p>
                   </Section>
                 )}
                 {info.composition && (
-                  <Section title="何でできているか">
-                    <p className="text-sm leading-relaxed">
+                  <Section icon={FlaskConical} title="何でできているか">
+                    <p className="text-sm leading-relaxed text-foreground/90">
                       {info.composition}
                     </p>
                   </Section>
                 )}
                 {info.taste_profile && (
-                  <Section title="味の特徴">
-                    <p className="text-sm leading-relaxed">
+                  <Section icon={UtensilsCrossed} title="味の特徴">
+                    <p className="text-sm leading-relaxed text-foreground/90">
                       {info.taste_profile}
                     </p>
                   </Section>
                 )}
                 {info.pairings && info.pairings.length > 0 && (
-                  <Section title="相性のいい食材">
-                    <ul className="space-y-1.5 text-sm leading-relaxed">
+                  <Section icon={HeartHandshake} title="相性のいい食材">
+                    <ul className="space-y-2 text-sm leading-relaxed">
                       {info.pairings.map((p, i) => (
-                        <li key={i} className="flex gap-2">
-                          <span className="font-medium flex-shrink-0">
+                        <li
+                          key={i}
+                          className="flex flex-wrap items-baseline gap-x-2"
+                        >
+                          <span className="font-semibold text-foreground">
                             {p.food}
                           </span>
-                          <span className="text-muted-foreground">
-                            — {p.reason}
-                          </span>
+                          {p.reason && (
+                            <span className="text-muted-foreground">
+                              {p.reason}
+                            </span>
+                          )}
                         </li>
                       ))}
                     </ul>
                   </Section>
                 )}
                 {info.alternatives && info.alternatives.length > 0 && (
-                  <Section title="代替品 (ホーチミンで手に入りやすい順)">
-                    <ol className="space-y-1.5 text-sm leading-relaxed list-decimal list-inside">
+                  <Section
+                    icon={ArrowLeftRight}
+                    title="代替品"
+                    hint="ホーチミンで手に入りやすい順"
+                  >
+                    <ol className="space-y-2 text-sm leading-relaxed">
                       {info.alternatives.map((a, i) => (
-                        <li key={i}>
-                          <span className="font-medium">{a.name}</span>
+                        <li
+                          key={i}
+                          className="flex flex-wrap items-baseline gap-x-2"
+                        >
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-muted text-xs font-semibold tabular-nums flex-shrink-0">
+                            {i + 1}
+                          </span>
+                          <span className="font-semibold text-foreground">
+                            {a.name}
+                          </span>
                           {a.reason && (
                             <span className="text-muted-foreground">
-                              {" "}
-                              — {a.reason}
+                              {a.reason}
                             </span>
                           )}
                         </li>
@@ -170,13 +194,13 @@ export function IngredientPopup({
                   </Section>
                 )}
                 {info.nutrition_tags && info.nutrition_tags.length > 0 && (
-                  <Section title="栄養">
+                  <Section icon={Apple} title="栄養">
                     <div className="flex flex-wrap gap-1.5">
                       {info.nutrition_tags.map((t, i) => {
                         const label = stripEmoji(t);
                         if (!label) return null;
                         return (
-                          <Badge key={`${t}-${i}`} variant="secondary">
+                          <Badge key={`${t}-${i}`} variant="outline">
                             {label}
                           </Badge>
                         );
@@ -186,23 +210,8 @@ export function IngredientPopup({
                 )}
               </div>
             ) : (
-              <div className="py-8 flex flex-col items-center gap-3 text-center">
-                <p className="text-sm text-muted-foreground">
-                  まだ詳細が登録されていません
-                </p>
-                <Button
-                  size="sm"
-                  onClick={handleGenerate}
-                  disabled={generating}
-                  className="gap-1.5"
-                >
-                  {generating ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-4 h-4" />
-                  )}
-                  {generating ? "生成中…" : "AI で生成する"}
-                </Button>
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                この食材の詳細はまだ生成できませんでした。あとで再度開いてみてください。
               </div>
             )}
           </>
@@ -212,18 +221,45 @@ export function IngredientPopup({
   );
 }
 
+function GeneratingState({ name }: { name: string }) {
+  return (
+    <div className="mt-6 py-10 flex flex-col items-center gap-3 text-center">
+      <div className="relative">
+        <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+      </div>
+      <div className="space-y-1">
+        <p className="text-base font-semibold">「{name}」を調べています</p>
+        <p className="text-sm text-muted-foreground">
+          AI が由来や味の秘密を集めています…
+        </p>
+        <p className="text-xs text-muted-foreground">
+          初回のみ少し時間がかかります(次からは一瞬で開きます)
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function Section({
+  icon: Icon,
   title,
+  hint,
   children,
 }: {
+  icon: React.ComponentType<{ className?: string }>;
   title: string;
+  hint?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-1.5">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </h3>
+    <section className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Icon className="w-4 h-4 text-primary" />
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {hint && (
+          <span className="text-xs text-muted-foreground">{hint}</span>
+        )}
+      </div>
       {children}
     </section>
   );
