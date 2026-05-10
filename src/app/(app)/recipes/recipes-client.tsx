@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Package, Plus, ShoppingBasket, UtensilsCrossed } from "lucide-react";
@@ -9,8 +9,41 @@ import { AppHeader } from "@/components/layout/app-header";
 import { AddRecipeDialog } from "@/components/recipe/add-recipe-dialog";
 import { StaplesPopup } from "@/components/staples/staples-popup";
 import { InventoryPopup } from "@/components/inventory/inventory-popup";
-import type { InventoryItem, Recipe, Staple } from "@/types/database";
-import { extractCountryFlag } from "@/lib/utils";
+import {
+  MAIN_INGREDIENT_TAGS,
+  MAIN_INGREDIENT_TAG_EMOJI,
+  type InventoryItem,
+  type MainIngredientTag,
+  type Recipe,
+  type Staple,
+} from "@/types/database";
+import { cn, extractCountryFlag } from "@/lib/utils";
+
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "flex-shrink-0 inline-flex items-center px-3 py-1.5 rounded-full text-sm border transition-colors",
+        active
+          ? "bg-primary text-primary-foreground border-primary"
+          : "bg-card text-foreground border-border hover:bg-muted",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
 
 function GalleryTile({
   recipe,
@@ -71,6 +104,27 @@ export function RecipesClient({
   const [addOpen, setAddOpen] = useState(false);
   const [staplesOpen, setStaplesOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<Set<MainIngredientTag>>(
+    () => new Set(),
+  );
+
+  const toggleTag = (tag: MainIngredientTag) => {
+    setSelectedTags((prev) => {
+      const next = new Set(prev);
+      if (next.has(tag)) next.delete(tag);
+      else next.add(tag);
+      return next;
+    });
+  };
+
+  const filteredRecipes = useMemo(() => {
+    if (selectedTags.size === 0) return recipes;
+    return recipes.filter(
+      (r) =>
+        r.main_ingredient_tag !== null &&
+        selectedTags.has(r.main_ingredient_tag),
+    );
+  }, [recipes, selectedTags]);
 
   return (
     <div className="flex flex-col">
@@ -110,15 +164,43 @@ export function RecipesClient({
           </div>
         </div>
 
+        {/* 主食材タグフィルタ (横スクロール、複数選択可、左端「すべて」) */}
+        {recipes.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1">
+            <FilterChip
+              active={selectedTags.size === 0}
+              onClick={() => setSelectedTags(new Set())}
+            >
+              すべて
+            </FilterChip>
+            {MAIN_INGREDIENT_TAGS.map((tag) => (
+              <FilterChip
+                key={tag}
+                active={selectedTags.has(tag)}
+                onClick={() => toggleTag(tag)}
+              >
+                <span className="mr-1">{MAIN_INGREDIENT_TAG_EMOJI[tag]}</span>
+                {tag}
+              </FilterChip>
+            ))}
+          </div>
+        )}
+
         {recipes.length === 0 ? (
           <EmptyState
             icon={<UtensilsCrossed className="w-6 h-6" />}
             title="レシピがまだありません"
             description="右上の + から追加しましょう"
           />
+        ) : filteredRecipes.length === 0 ? (
+          <EmptyState
+            icon={<UtensilsCrossed className="w-6 h-6" />}
+            title="該当するレシピがありません"
+            description="フィルタを変えてみましょう"
+          />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-4">
-            {recipes.map((recipe, i) => (
+            {filteredRecipes.map((recipe, i) => (
               <GalleryTile
                 key={recipe.id}
                 recipe={recipe}
