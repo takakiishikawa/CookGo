@@ -15,6 +15,8 @@ interface IngredientThumbProps {
   className?: string;
   /** true なら右上に画像再生成ボタンを重ねる */
   regenerable?: boolean;
+  /** 検索文脈。"supermarket" にするとパッケージ商品寄りの画像を優先 */
+  queryContext?: "supermarket";
 }
 
 const SIZE_CLASS: Record<ThumbSize, string> = {
@@ -46,22 +48,23 @@ const REGEN_ICON_SIZE: Record<ThumbSize, string> = {
 };
 
 /**
- * 食材のサムネイル。Unsplash query にスーパー商品っぽい修飾を加える。
- * regenerable=true で右上に画像差し替えオーバーレイを表示。
+ * 食材のサムネイル。queryContext + category を /api/image に渡し、
+ * 取得失敗時はカテゴリ代表画像にフォールバックする。
  */
 export function IngredientThumb({
   ingredient: ing,
   size = "md",
   className,
   regenerable = false,
+  queryContext,
 }: IngredientThumbProps) {
   const baseName = ing.name_en ?? ing.name;
-  // 単品商品 (single product) を狙う: 「grocery store product」サフィックスは
-  // 棚陳列画像を引きやすいため使わず、bare name を /api/image に渡してバリエーション
-  // 検索 (food / fresh ingredient) でフォールバックさせる
   const query = baseName || null;
   const [seed, setSeed] = useState(1);
-  const { imageUrl, loading } = useFoodImage(query, seed);
+  const { imageUrl, loading } = useFoodImage(query, seed, {
+    context: queryContext,
+    category: ing.category ?? null,
+  });
 
   const sizeClass = SIZE_CLASS[size];
   const iconClass = ICON_SIZE_CLASS[size];

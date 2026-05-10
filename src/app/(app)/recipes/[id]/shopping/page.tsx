@@ -22,7 +22,10 @@ export default async function RecipeShoppingPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/");
 
-  const recipe = await db.recipes.getById(supabase, user.id, id);
+  const [recipe, inventory] = await Promise.all([
+    db.recipes.getById(supabase, user.id, id),
+    db.inventory.getAll(supabase, user.id),
+  ]);
   if (!recipe) notFound();
 
   const { data: stateRow } = await supabase
@@ -33,19 +36,21 @@ export default async function RecipeShoppingPage({
     .eq("recipe_id", id)
     .maybeSingle();
 
-  const initialItems: RecipeShoppingStateItem[] =
-    Array.isArray(
-      (stateRow?.state as { items?: unknown } | null)?.items,
-    )
-      ? ((stateRow!.state as { items: RecipeShoppingStateItem[] }).items)
-      : [];
+  const initialItems: RecipeShoppingStateItem[] = Array.isArray(
+    (stateRow?.state as { items?: unknown } | null)?.items,
+  )
+    ? (stateRow!.state as { items: RecipeShoppingStateItem[] }).items
+    : [];
 
   const initialServings = Number(sp.servings);
+  const hasShoppingState = !!stateRow;
 
   return (
     <ShoppingClient
       recipe={recipe}
+      inventoryNames={inventory.map((i) => i.name)}
       initialItems={initialItems}
+      hasShoppingState={hasShoppingState}
       initialServings={
         Number.isFinite(initialServings) && initialServings > 0
           ? initialServings

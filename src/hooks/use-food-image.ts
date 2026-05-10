@@ -8,13 +8,23 @@ interface UseFoodImageResult {
   error: boolean;
 }
 
+interface UseFoodImageOptions {
+  /** "supermarket" でパッケージ商品寄りの画像を優先 */
+  context?: "supermarket";
+  /** protein/vegetable/carb/seasoning/other。取得失敗時のフォールバック用 */
+  category?: string | null;
+}
+
 export function useFoodImage(
   query: string | null,
   seed = 1,
+  options: UseFoodImageOptions = {},
 ): UseFoodImageResult {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(!!query);
   const [error, setError] = useState(false);
+
+  const { context, category } = options;
 
   useEffect(() => {
     if (!query) {
@@ -27,11 +37,11 @@ export function useFoodImage(
     setLoading(true);
     setError(false);
     setImageUrl(null);
-    const url =
-      seed > 1
-        ? `/api/image?query=${encodeURIComponent(query)}&seed=${seed}`
-        : `/api/image?query=${encodeURIComponent(query)}`;
-    fetch(url)
+    const params = new URLSearchParams({ query });
+    if (seed > 1) params.set("seed", String(seed));
+    if (context) params.set("context", context);
+    if (category) params.set("category", category);
+    fetch(`/api/image?${params.toString()}`)
       .then((r) => r.json())
       .then((d: { imageUrl: string | null }) => {
         if (!cancelled) {
@@ -48,7 +58,7 @@ export function useFoodImage(
     return () => {
       cancelled = true;
     };
-  }, [query, seed]);
+  }, [query, seed, context, category]);
 
   return { imageUrl, loading, error };
 }

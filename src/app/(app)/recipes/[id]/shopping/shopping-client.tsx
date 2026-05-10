@@ -4,10 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
+  Info,
   Minus,
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
   Trash2,
   X,
 } from "lucide-react";
@@ -21,6 +23,7 @@ import {
 import { AppHeader } from "@/components/layout/app-header";
 import { IngredientThumb } from "@/components/recipe/ingredient-thumb";
 import { AddIngredientDialog } from "@/components/recipe/add-ingredient-dialog";
+import { IngredientPopup } from "@/components/ingredient/ingredient-popup";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { DB_SCHEMA } from "@/lib/constants";
@@ -39,6 +42,8 @@ import type { DraftRecipe, RecipeSaveRequest } from "@/types/api";
 interface ShoppingClientProps {
   recipe: Recipe;
   initialItems: RecipeShoppingStateItem[];
+  inventoryNames: string[];
+  hasShoppingState: boolean;
   initialServings: number;
 }
 
@@ -64,9 +69,15 @@ function recipeToDraftWithIngredients(
   };
 }
 
+function normalizeName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
 export function ShoppingClient({
   recipe,
   initialItems,
+  inventoryNames,
+  hasShoppingState,
   initialServings,
 }: ShoppingClientProps) {
   const supabase = createClient();
@@ -74,21 +85,34 @@ export function ShoppingClient({
   const baseServings = Math.max(1, recipe.servings || 1);
   const seedIngredients = (recipe.ingredients as RecipeIngredient[]) ?? [];
 
-  // 食材は server prop からだけでなく、編集モード中の追加/編集/削除も
-  // ローカルで反映できるよう state にコピー
+  // 在庫名のセット(正規化済み)
+  const inventorySet = useMemo(
+    () => new Set(inventoryNames.map(normalizeName)),
+    [inventoryNames],
+  );
+  const isInInventory = (ing: RecipeIngredient) =>
+    inventorySet.has(normalizeName(ing.name));
+
   const [ingredients, setIngredients] =
     useState<RecipeIngredient[]>(seedIngredients);
 
   const [servings, setServings] = useState<number>(initialServings);
   const ratio = useMemo(() => servings / baseServings, [servings, baseServings]);
 
+  // 初回 checkedMap:
+  //  - DB に shopping_state がある場合は DB の値が真(ユーザー判断尊重)
+  //  - 無い場合は在庫マッチで初期チェック
   const [checkedMap, setCheckedMap] = useState<Record<number, boolean>>(() => {
     const initial: Record<number, boolean> = {};
-    seedIngredients.forEach((_, i) => {
-      const found = initialItems.find((s) => s.index === i);
-      initial[i] = found
-        ? found.is_purchased || found.is_needed === false
-        : false;
+    seedIngredients.forEach((ing, i) => {
+      if (hasShoppingState) {
+        const found = initialItems.find((s) => s.index === i);
+        initial[i] = found
+          ? found.is_purchased || found.is_needed === false
+          : isInInventory(ing);
+      } else {
+        initial[i] = isInInventory(ing);
+      }
     });
     return initial;
   });
@@ -96,13 +120,17 @@ export function ShoppingClient({
   // ===== 編集モード関連 =====
   const [editMode, setEditMode] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
-  // 編集モード入り時のスナップショット (キャンセル用)
   const snapshot = useRef<{
     ingredients: RecipeIngredient[];
     checkedMap: Record<number, boolean>;
   } | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editIdx, setEditIdx] = useState<number | null>(null);
+
+  // ===== 食材ポップアップ =====
+  const [infoIngredient, setInfoIngredient] = useState<RecipeIngredient | null>(
+    null,
+  );
 
   const enterEditMode = () => {
     snapshot.current = {
@@ -126,7 +154,7 @@ export function ShoppingClient({
   const handleAdd = (ing: RecipeIngredient) => {
     const newIdx = ingredients.length;
     setIngredients((prev) => [...prev, ing]);
-    setCheckedMap((prev) => ({ ...prev, [newIdx]: false }));
+    setCheckedMap((prev) => ({ ...prev, [newIdx]: isInInventory(ing) }));
   };
 
   const handleEditSubmit = (ing: RecipeIngredient) => {
@@ -138,7 +166,6 @@ export function ShoppingClient({
 
   const handleDelete = (idx: number) => {
     setIngredients((prev) => prev.filter((_, i) => i !== idx));
-    // checkedMap のキーをシフト
     setCheckedMap((prev) => {
       const next: Record<number, boolean> = {};
       Object.entries(prev).forEach(([k, v]) => {
@@ -165,7 +192,6 @@ export function ShoppingClient({
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      // 食材インデックス変更後の checkedMap も即座に永続化
       await persistState(checkedMap);
       toast.success("食材リストを更新しました");
       snapshot.current = null;
@@ -189,7 +215,6 @@ export function ShoppingClient({
       groups
         .map((g) => ({
           ...g,
-          // 編集モード中は購入済みでも表示する (まとめて操作するため)
           items: editMode
             ? g.items
             : g.items.filter((it) => !checkedMap[it.index]),
@@ -200,9 +225,7 @@ export function ShoppingClient({
 
   const checkedItems = useMemo(
     () =>
-      groups.flatMap((g) =>
-        g.items.filter((it) => !!checkedMap[it.index]),
-      ),
+      groups.flatMap((g) => g.items.filter((it) => !!checkedMap[it.index])),
     [groups, checkedMap],
   );
 
@@ -243,7 +266,6 @@ export function ShoppingClient({
   };
 
   useEffect(() => {
-    // 編集モード中はチェック切り替えできないので debounce 永続化を無効化
     if (editMode) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => persistState(checkedMap), 600);
@@ -258,80 +280,53 @@ export function ShoppingClient({
     setCheckedMap((prev) => ({ ...prev, [i]: !prev[i] }));
   };
 
+  const resetToInitial = () => {
+    if (editMode) return;
+    const next: Record<number, boolean> = {};
+    ingredients.forEach((ing, i) => {
+      next[i] = isInInventory(ing);
+    });
+    setCheckedMap(next);
+    toast.success("最初の状態に戻しました");
+  };
+
   const renderItem = (index: number, ing: RecipeIngredient) => {
     const checked = !!checkedMap[index];
     const amountText = scaleAmountText(ing.amount, ing.unit, ratio);
     const interactive = !editMode;
-    return (
-      <div
-        key={index}
-        role={interactive ? "button" : undefined}
-        tabIndex={interactive ? 0 : -1}
-        aria-pressed={interactive ? checked : undefined}
-        onClick={interactive ? () => toggleChecked(index) : undefined}
-        onKeyDown={
-          interactive
-            ? (e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  toggleChecked(index);
-                }
-              }
-            : undefined
-        }
-        className={cn(
-          "w-full text-left flex items-center gap-3 px-3 py-3 rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          editMode
-            ? "bg-card border-border"
-            : checked
-              ? "bg-primary/5 border-primary/40 cursor-pointer"
-              : "bg-card border-border hover:bg-muted cursor-pointer",
-        )}
-      >
-        <IngredientThumb ingredient={ing} size="md" regenerable={!editMode} />
-        <div className="flex-1 min-w-0 space-y-0.5">
-          <div className="flex items-baseline gap-2">
-            <p
-              className={cn(
-                "text-sm font-medium truncate flex-1",
-                !editMode && checked && "line-through text-muted-foreground",
-              )}
-            >
-              {ing.name}
-            </p>
-            <p
-              className={cn(
-                "text-xs tabular-nums whitespace-nowrap flex-shrink-0",
-                !editMode && checked
-                  ? "line-through text-muted-foreground"
-                  : "text-muted-foreground",
-              )}
-            >
-              {amountText}
-            </p>
+
+    if (editMode) {
+      return (
+        <div
+          key={index}
+          className="w-full flex items-center gap-3 px-3 py-3 rounded-lg border bg-card border-border"
+        >
+          <IngredientThumb
+            ingredient={ing}
+            size="md"
+            regenerable={false}
+            queryContext="supermarket"
+          />
+          <div className="flex-1 min-w-0 space-y-0.5">
+            <div className="flex items-baseline gap-2">
+              <p className="text-base font-medium truncate flex-1 text-foreground">
+                {ing.name}
+              </p>
+              <p className="text-sm tabular-nums whitespace-nowrap flex-shrink-0 text-foreground/70">
+                {amountText}
+              </p>
+            </div>
+            {ing.name_en && (
+              <p className="text-base truncate text-foreground/80">
+                {ing.name_en}
+              </p>
+            )}
+            {ing.name_vi && (
+              <p className="text-base truncate text-foreground/80">
+                {ing.name_vi}
+              </p>
+            )}
           </div>
-          {ing.name_en && (
-            <p
-              className={cn(
-                "text-sm truncate text-muted-foreground/80",
-                !editMode && checked && "line-through",
-              )}
-            >
-              {ing.name_en}
-            </p>
-          )}
-          {ing.name_vi && (
-            <p
-              className={cn(
-                "text-sm truncate text-muted-foreground/70",
-                !editMode && checked && "line-through",
-              )}
-            >
-              {ing.name_vi}
-            </p>
-          )}
-        </div>
-        {editMode ? (
           <div className="flex items-center gap-1 flex-shrink-0">
             <Button
               size="icon"
@@ -358,7 +353,41 @@ export function ShoppingClient({
               <Trash2 className="w-3.5 h-3.5" />
             </Button>
           </div>
-        ) : (
+        </div>
+      );
+    }
+
+    return (
+      <div
+        key={index}
+        className={cn(
+          "w-full flex items-stretch rounded-lg border transition-colors",
+          checked
+            ? "bg-primary/5 border-primary/40"
+            : "bg-card border-border",
+        )}
+      >
+        {/* メインエリア: タップでチェック切り替え */}
+        <div
+          role={interactive ? "button" : undefined}
+          tabIndex={interactive ? 0 : -1}
+          aria-pressed={interactive ? checked : undefined}
+          onClick={interactive ? () => toggleChecked(index) : undefined}
+          onKeyDown={
+            interactive
+              ? (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggleChecked(index);
+                  }
+                }
+              : undefined
+          }
+          className={cn(
+            "flex-1 flex items-center gap-3 px-3 py-3 rounded-l-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            !checked && "hover:bg-muted",
+          )}
+        >
           <div
             className={cn(
               "w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors",
@@ -370,7 +399,66 @@ export function ShoppingClient({
           >
             {checked && <Check className="w-3.5 h-3.5" />}
           </div>
-        )}
+          <IngredientThumb
+            ingredient={ing}
+            size="md"
+            regenerable={false}
+            queryContext="supermarket"
+          />
+          <div className="flex-1 min-w-0 space-y-0.5">
+            <div className="flex items-baseline gap-2">
+              <p
+                className={cn(
+                  "text-base font-medium truncate flex-1 text-foreground",
+                  checked && "line-through opacity-60",
+                )}
+              >
+                {ing.name}
+              </p>
+              <p
+                className={cn(
+                  "text-sm tabular-nums whitespace-nowrap flex-shrink-0 text-foreground/70",
+                  checked && "line-through opacity-60",
+                )}
+              >
+                {amountText}
+              </p>
+            </div>
+            {ing.name_en && (
+              <p
+                className={cn(
+                  "text-base truncate text-foreground/80",
+                  checked && "line-through opacity-60",
+                )}
+              >
+                {ing.name_en}
+              </p>
+            )}
+            {ing.name_vi && (
+              <p
+                className={cn(
+                  "text-base truncate text-foreground/80",
+                  checked && "line-through opacity-60",
+                )}
+              >
+                {ing.name_vi}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* ⓘ ボタン: 食材ポップアップを開く */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setInfoIngredient(ing);
+          }}
+          aria-label={`${ing.name} の詳細`}
+          className="flex items-center justify-center w-12 border-l border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-r-lg transition-colors"
+        >
+          <Info className="w-5 h-5" />
+        </button>
       </div>
     );
   };
@@ -380,8 +468,7 @@ export function ShoppingClient({
     () => Object.values(checkedMap).filter(Boolean).length,
     [checkedMap],
   );
-  const allDone =
-    !editMode && totalCount > 0 && checkedCount === totalCount;
+  const allDone = !editMode && totalCount > 0 && checkedCount === totalCount;
 
   return (
     <div className="flex flex-col">
@@ -436,7 +523,7 @@ export function ShoppingClient({
           )}
         </div>
 
-        {/* 進捗 + 人数 (購入済み/家にあるどちらでもチェック=「そろった」) */}
+        {/* 進捗 + 人数 */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm tabular-nums">
             {allDone ? (
@@ -489,7 +576,7 @@ export function ShoppingClient({
           </div>
         </div>
 
-        {/* 食材リスト (グループ別 + PC 2列) */}
+        {/* 食材リスト */}
         {totalCount === 0 && !editMode ? (
           <Card>
             <CardContent className="p-6 text-sm text-muted-foreground text-center">
@@ -544,15 +631,29 @@ export function ShoppingClient({
             )}
           </div>
         )}
+
+        {/* 最初に戻すボタン: ユーザー操作のみリセット、在庫由来は維持 */}
+        {!editMode && totalCount > 0 && (
+          <div className="pt-4 flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={resetToInitial}
+              className="gap-1.5 text-muted-foreground"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              最初に戻す
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* 追加ダイアログ */}
+      {/* 追加 / 編集ダイアログ */}
       <AddIngredientDialog
         open={addOpen}
         onOpenChange={setAddOpen}
         onSubmit={handleAdd}
       />
-      {/* 編集ダイアログ (initial を渡すと編集モード) */}
       <AddIngredientDialog
         open={editIdx !== null}
         onOpenChange={(o) => {
@@ -560,6 +661,14 @@ export function ShoppingClient({
         }}
         onSubmit={handleEditSubmit}
         initial={editIdx !== null ? ingredients[editIdx] : null}
+      />
+
+      {/* 食材ポップアップ */}
+      <IngredientPopup
+        ingredient={infoIngredient}
+        onOpenChange={(o) => {
+          if (!o) setInfoIngredient(null);
+        }}
       />
     </div>
   );
