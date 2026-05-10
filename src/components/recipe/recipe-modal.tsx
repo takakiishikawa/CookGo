@@ -55,7 +55,7 @@ export function RecipeModal({
   )}`;
 
   const openShoppingList = () => {
-    onOpenChange(false);
+    // モーダルは閉じずにそのまま遷移(閉じるアニメで一覧がチラつくのを避ける)
     router.push(`/recipes/${recipe.id}/shopping`);
   };
 
@@ -115,7 +115,7 @@ export function RecipeModal({
                 const label = stripEmoji(t);
                 if (!label) return null;
                 return (
-                  <Badge key={`${t}-${i}`} variant="secondary">
+                  <Badge key={`${t}-${i}`} variant="outline">
                     {label}
                   </Badge>
                 );
@@ -123,13 +123,13 @@ export function RecipeModal({
             </div>
           )}
 
-          {/* メインアクション 3 つ(同格) */}
-          <div className="grid grid-cols-3 gap-2 pt-1">
-            <Button variant="outline" onClick={openShoppingList} className="gap-1.5">
+          {/* メインアクション 3 つ(同格・塗りで強調しタグと区別) */}
+          <div className="grid grid-cols-3 gap-2 pt-2">
+            <Button onClick={openShoppingList} className="gap-1.5">
               <ShoppingCart className="w-4 h-4" />
               買い物
             </Button>
-            <Button variant="outline" asChild className="gap-1.5">
+            <Button asChild className="gap-1.5">
               <a
                 href={youtubeSearchUrl}
                 target="_blank"
@@ -140,7 +140,6 @@ export function RecipeModal({
               </a>
             </Button>
             <Button
-              variant="outline"
               asChild
               disabled={!recipe.source_url}
               className="gap-1.5"
