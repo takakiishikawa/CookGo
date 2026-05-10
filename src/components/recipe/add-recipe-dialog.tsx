@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import {
   ExternalLink,
   Globe,
+  Plus,
   RefreshCw,
   Sparkles,
   TriangleAlert,
   UtensilsCrossed,
+  X,
 } from "lucide-react";
 import {
   Alert,
@@ -75,7 +77,7 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
     STAGE_MESSAGES_IMPORT,
   );
 
-  const [urlInput, setUrlInput] = useState("");
+  const [urlInputs, setUrlInputs] = useState<string[]>([""]);
   const [loadingCount, setLoadingCount] = useState(0);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [pasteText, setPasteText] = useState("");
@@ -94,7 +96,7 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
       setStep("input");
       setBusy(false);
       setStageIndex(0);
-      setUrlInput("");
+      setUrlInputs([""]);
       setPasteText("");
       setAiQuery("");
       setPendingUrl(null);
@@ -391,22 +393,63 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
 
             <TabsContent value="url" className="mt-4 space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="recipe-url">レシピの URL</Label>
-                <Textarea
-                  id="recipe-url"
-                  rows={4}
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  placeholder={"https://...\nhttps://...\n複数貼れば個別レシピで一括登録"}
+                <Label>レシピの URL</Label>
+                <div className="space-y-2">
+                  {urlInputs.map((url, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Input
+                        type="url"
+                        value={url}
+                        onChange={(e) =>
+                          setUrlInputs((prev) =>
+                            prev.map((v, idx) =>
+                              idx === i ? e.target.value : v,
+                            ),
+                          )
+                        }
+                        placeholder="https://..."
+                        disabled={busy}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() =>
+                          setUrlInputs((prev) =>
+                            prev.length === 1
+                              ? [""]
+                              : prev.filter((_, idx) => idx !== i),
+                          )
+                        }
+                        disabled={
+                          busy ||
+                          (urlInputs.length === 1 && !urlInputs[0].trim())
+                        }
+                        aria-label="この URL を削除"
+                        className="text-muted-foreground hover:text-destructive flex-shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setUrlInputs((prev) => [...prev, ""])}
                   disabled={busy}
-                  className="font-mono text-xs"
-                />
+                  className="gap-1.5 text-muted-foreground"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  URL を追加
+                </Button>
               </div>
               <DialogFooter className="pt-1">
                 <Button
                   onClick={() => {
-                    const urls = urlInput
-                      .split(/\n+/)
+                    const urls = urlInputs
                       .map((s) => s.trim())
                       .filter((s) => /^https?:\/\//i.test(s));
                     if (urls.length === 0) {
@@ -419,7 +462,10 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
                       importAndSaveMany(urls);
                     }
                   }}
-                  disabled={busy || !urlInput.trim()}
+                  disabled={
+                    busy ||
+                    !urlInputs.some((s) => /^https?:\/\//i.test(s.trim()))
+                  }
                   className="gap-1.5"
                 >
                   {busy ? (

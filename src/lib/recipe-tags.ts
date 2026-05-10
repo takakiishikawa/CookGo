@@ -1,11 +1,13 @@
 import type { LucideIcon } from "lucide-react";
-import { Beef, Fish, Salad, Soup } from "lucide-react";
+import { Beef, Drumstick, Fish, Ham, Salad, Soup } from "lucide-react";
 import type { MainIngredientTag } from "@/types/database";
 
 /** 主食材タグに対応する lucide アイコン */
 export const MAIN_INGREDIENT_TAG_ICON: Record<MainIngredientTag, LucideIcon> = {
   魚: Fish,
-  肉: Beef,
+  鳥: Drumstick,
+  豚: Ham,
+  牛: Beef,
   麺: Soup,
   "つまみ・副菜": Salad,
 };

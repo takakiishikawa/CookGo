@@ -17,7 +17,7 @@ export const SCHEMA_SAMPLE = `{
   "description": "1〜2文の説明",
   "prep_time_min": 20,
   "servings": 1,
-  "main_ingredient_tag": "肉",
+  "main_ingredient_tag": "豚",
   "country_tag": "日本",
   "nutrition_tags": ["高タンパク", "ビタミンB豊富"],
   "ingredients": [
@@ -64,10 +64,12 @@ export const FIXED_CONSTRAINTS = `【固定条件（最優先・必ず守る）�
 - ingredients[*].unit は数値量のときは "g" / "ml" など。"大さじ2" のように amount に単位が含まれる場合は空文字 ""
 - name_en / name_vi はサーバー側で後から自動付与するため出力不要（出力しても無視される）
 - 出力する全テキストには絵文字・国旗記号を含めない(プレーン日本語のみ)
-- main_ingredient_tag は必須。次の 4 種から 1 つだけ選ぶ:
-  - "魚" : 魚介類が主役
-  - "肉" : 鶏豚牛などの獣肉が主役
-  - "麺" : 麺類が主役
+- main_ingredient_tag は必須。次の 6 種から 1 つだけ選ぶ:
+  - "魚" : 魚介類(白身/青魚/エビ/イカ/タコ/貝など)が主役
+  - "鳥" : 鶏肉・鴨肉など鳥類が主役
+  - "豚" : 豚肉が主役
+  - "牛" : 牛肉が主役
+  - "麺" : 麺類(うどん/そば/ラーメン/パスタ/ビーフン等)が主役
   - "つまみ・副菜" : 上記に当てはまらない、または小皿/酒のあて
 - country_tag は必須。発祥国を日本語の国名のみで出力(絵文字や記号は付けない)。例: "日本" / "中国" / "韓国" / "タイ" / "ベトナム" / "イタリア" / "フランス" / "メキシコ" / "インド" / "アメリカ"。多国籍融合料理で迷ったら、最も近い 1 国を選ぶ
 - nutrition_tags は 2〜3 個。プレーン日本語の短いラベルにする(絵文字を付けない)。例: "高タンパク" / "炭水化物中心" / "食物繊維豊富" / "ビタミンB豊富" / "マグネシウム豊富" / "良質脂質"。範囲外でも適切なら可
@@ -138,7 +140,9 @@ function normalizeStringArray(raw: unknown, max: number): string[] {
 
 const VALID_MAIN_TAGS: ReadonlySet<string> = new Set([
   "魚",
-  "肉",
+  "鳥",
+  "豚",
+  "牛",
   "麺",
   "つまみ・副菜",
 ]);

@@ -17,7 +17,9 @@ export const maxDuration = 60;
 const BATCH = 20;
 const VALID_MAIN: ReadonlySet<string> = new Set([
   "魚",
-  "肉",
+  "鳥",
+  "豚",
+  "牛",
   "麺",
   "つまみ・副菜",
 ]);
@@ -52,9 +54,13 @@ async function classifyOne(r: RecipeRow): Promise<Classification | null> {
 - 主要食材: ${ingredients || "(不明)"}
 
 【出力ルール】
-- main_ingredient_tag は次の 4 種から 1 つ:
-  - "魚" / "肉" / "麺" / "つまみ・副菜"
-  - 主役の食材で判定。当てはまらなければ "つまみ・副菜"
+- main_ingredient_tag は次の 6 種から 1 つ:
+  - "魚" : 魚介類が主役
+  - "鳥" : 鶏肉・鴨肉など鳥類が主役
+  - "豚" : 豚肉が主役
+  - "牛" : 牛肉が主役
+  - "麺" : 麺類が主役
+  - "つまみ・副菜" : 上記に当てはまらない、または小皿/酒のあて
 - country_tag は発祥国を日本語の国名のみで(絵文字・記号は付けない):
   - 例: "日本" / "中国" / "韓国" / "タイ" / "ベトナム" / "イタリア" / "フランス" / "メキシコ" / "インド" / "アメリカ"
   - 不明なら最も近い 1 国を選ぶ

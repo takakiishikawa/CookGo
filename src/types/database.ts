@@ -20,7 +20,14 @@ export const RECIPE_SOURCE_LABELS: Record<RecipeSourceTag, string> = {
 // ---------------------------------------------------------------------------
 
 /** 主食材タグ。トップのフィルタで使う */
-export const MAIN_INGREDIENT_TAGS = ["魚", "肉", "麺", "つまみ・副菜"] as const;
+export const MAIN_INGREDIENT_TAGS = [
+  "魚",
+  "鳥",
+  "豚",
+  "牛",
+  "麺",
+  "つまみ・副菜",
+] as const;
 export type MainIngredientTag = (typeof MAIN_INGREDIENT_TAGS)[number];
 
 /** 栄養プロファイルタグの代表例(AI は範囲外も可) */
