@@ -114,7 +114,7 @@ export function StaplesPopup({
         <DialogHeader>
           <DialogTitle>定番</DialogTitle>
           <DialogDescription>
-            鶏胸肉・豆腐・卵など、いつも買うものを登録
+            よく買うものを登録
           </DialogDescription>
         </DialogHeader>
 

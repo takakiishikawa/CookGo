@@ -43,28 +43,31 @@ function isJapanese(s: string): boolean {
 }
 
 /** 1 つの query に対し supermarket 文脈の variant 候補を作る。
- *  陳列棚で複数商品が映った写真ではなく、"単品" にフォーカスした絵を狙う */
+ *  - "食品 / food / ingredient" を必ず含めて非食品ヒットを除外
+ *  - "単品" にフォーカスし陳列棚の混合写真を避ける
+ *  - 英訳側は "japanese" を添えて、見た目が似た韓国/中国製品の混入を抑える
+ *    (例: みりん → 韓国の조청, 醤油 → 中国の醤油 などを避ける)
+ */
 function supermarketVariants(query: string): string[] {
   if (isJapanese(query)) {
     return [
-      `${query} 単品 パッケージ`,
-      `${query} 商品 単体`,
-      `${query} 食材 撮影`,
+      `${query} 食品 商品 撮影`,
+      `${query} 食材 パッケージ 単品`,
     ];
   }
   return [
-    `${query} package isolated white background`,
-    `${query} single product photo`,
-    `${query} packaging close up`,
+    `${query} japanese food product`,
+    `${query} japanese cooking ingredient`,
+    `${query} food package isolated`,
   ];
 }
 
-/** 1 つの query に対し汎用 variant 候補を作る */
+/** 1 つの query に対し汎用 variant 候補を作る("食" の文脈を必ず含める) */
 function plainVariants(query: string): string[] {
   if (isJapanese(query)) {
-    return [`${query} food`, query];
+    return [`${query} 食品`, `${query} 食材`];
   }
-  return [query, `${query} food`, `${query} fresh ingredient`];
+  return [`${query} food`, `${query} ingredient`, `${query} cooking`];
 }
 
 export async function GET(request: Request) {

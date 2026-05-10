@@ -113,7 +113,7 @@ export function InventoryPopup({
         <DialogHeader>
           <DialogTitle>在庫</DialogTitle>
           <DialogDescription>
-            醤油・砂糖・水など、家にいつもある常備品を登録。買い物リストでは初期チェック済みになります。
+            常備品を登録すると、買い物リストで自動チェック
           </DialogDescription>
         </DialogHeader>
 
