@@ -26,6 +26,7 @@ export const MAIN_INGREDIENT_TAGS = [
   "豚",
   "牛",
   "麺",
+  "スープ",
   "つまみ・副菜",
 ] as const;
 export type MainIngredientTag = (typeof MAIN_INGREDIENT_TAGS)[number];
