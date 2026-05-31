@@ -1,9 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Check,
   ChevronRight,
   ExternalLink,
+  Pencil,
   ShoppingCart,
   Trash2,
   Video,
@@ -16,7 +19,11 @@ import {
   DialogTitle,
   toast,
 } from "@takaki/go-design-system";
-import type { Recipe } from "@/types/database";
+import {
+  MAIN_INGREDIENT_TAGS,
+  type MainIngredientTag,
+  type Recipe,
+} from "@/types/database";
 import {
   MAIN_INGREDIENT_TAG_ICON,
   extractCountryName,
@@ -37,6 +44,41 @@ export function RecipeModal({
 }: RecipeModalProps) {
   const router = useRouter();
 
+  const [mainTag, setMainTag] = useState<MainIngredientTag | null>(null);
+  const [editingTag, setEditingTag] = useState(false);
+  const [savingTag, setSavingTag] = useState(false);
+
+  // モーダルに渡るレシピが変わったらローカル状態を同期
+  useEffect(() => {
+    setMainTag(recipe?.main_ingredient_tag ?? null);
+    setEditingTag(false);
+    setSavingTag(false);
+  }, [recipe?.id, recipe?.main_ingredient_tag]);
+
+  const updateMainTag = async (tag: MainIngredientTag) => {
+    if (!recipe || savingTag) return;
+    const prev = mainTag;
+    setMainTag(tag);
+    setSavingTag(true);
+    try {
+      const res = await fetch(`/api/recipes/${recipe.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ main_ingredient_tag: tag }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setEditingTag(false);
+      toast.success(`「${tag}」に変更しました`);
+      router.refresh();
+    } catch (err) {
+      setMainTag(prev);
+      toast.error(err instanceof Error ? err.message : "更新に失敗しました");
+    } finally {
+      setSavingTag(false);
+    }
+  };
+
   const open = recipe !== null;
   if (!recipe) {
     return (
@@ -48,9 +90,7 @@ export function RecipeModal({
 
   const countryName = extractCountryName(recipe.country_tag);
   const countryFlag = getCountryFlag(countryName);
-  const MainIcon = recipe.main_ingredient_tag
-    ? MAIN_INGREDIENT_TAG_ICON[recipe.main_ingredient_tag]
-    : null;
+  const MainIcon = mainTag ? MAIN_INGREDIENT_TAG_ICON[mainTag] : null;
   const youtubeSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
     recipe.title + " 作り方",
   )}`;
@@ -84,22 +124,56 @@ export function RecipeModal({
             {recipe.title}
           </DialogTitle>
 
-          {(countryName || recipe.main_ingredient_tag) && (
-            <div className="flex flex-wrap gap-1.5">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               {countryName && (
                 <Badge variant="outline" className="gap-1">
                   {countryFlag && <span aria-hidden>{countryFlag}</span>}
                   {countryName}
                 </Badge>
               )}
-              {recipe.main_ingredient_tag && MainIcon && (
-                <Badge variant="outline" className="gap-1">
-                  <MainIcon className="w-3 h-3" />
-                  {recipe.main_ingredient_tag}
+              {/* 主食材タグ: タップで編集できる。AI 分類が誤っても手で直せる */}
+              <button
+                type="button"
+                onClick={() => setEditingTag((v) => !v)}
+                className="appearance-none"
+                aria-label="主食材タグを変更"
+              >
+                <Badge
+                  variant="outline"
+                  className="gap-1 cursor-pointer hover:bg-accent"
+                >
+                  {MainIcon && <MainIcon className="w-3 h-3" />}
+                  {mainTag ?? "主食材タグ未設定"}
+                  <Pencil className="w-2.5 h-2.5 opacity-60" />
                 </Badge>
-              )}
+              </button>
             </div>
-          )}
+
+            {editingTag && (
+              <div className="flex flex-wrap gap-1.5">
+                {MAIN_INGREDIENT_TAGS.map((tag) => {
+                  const Icon = MAIN_INGREDIENT_TAG_ICON[tag];
+                  const active = tag === mainTag;
+                  return (
+                    <Button
+                      key={tag}
+                      type="button"
+                      size="sm"
+                      variant={active ? "default" : "outline"}
+                      disabled={savingTag}
+                      onClick={() => updateMainTag(tag)}
+                      className="h-8 gap-1"
+                    >
+                      <Icon className="w-3 h-3" />
+                      {tag}
+                      {active && <Check className="w-3 h-3" />}
+                    </Button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           {recipe.nutrition_tags && recipe.nutrition_tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
