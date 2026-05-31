@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Camera,
   ExternalLink,
   Globe,
   Plus,
@@ -41,14 +42,52 @@ import type {
   RecipeRecommendation,
   RecipeRecommendResponse,
 } from "@/app/api/recipes/recommend/route";
+import type {
+  IdentifyResponse,
+  IdentifyResult,
+} from "@/app/api/recipes/identify/route";
 
 interface AddRecipeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-type Mode = "url" | "ai";
+type Mode = "url" | "ai" | "photo";
 type Step = "input" | "recommendations" | "paste" | "loading";
+
+/**
+ * 画像を canvas で長辺 maxDim 以下に縮小し、JPEG base64 を返す。
+ * Claude Vision は長辺 1568px 程度が推奨。送信ペイロードも軽くなる。
+ */
+async function fileToResizedBase64(
+  file: File,
+  maxDim = 1568,
+  quality = 0.82,
+): Promise<{ data: string; mediaType: string }> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("画像の読み込みに失敗しました"));
+    reader.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("画像を表示できませんでした"));
+    el.src = dataUrl;
+  });
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("画像を処理できませんでした");
+  ctx.drawImage(img, 0, 0, w, h);
+  const out = canvas.toDataURL("image/jpeg", quality);
+  return { data: out.split(",")[1] ?? "", mediaType: "image/jpeg" };
+}
 
 const RECOMMEND_TIMEOUT_MS = 90_000;
 const IMPORT_TIMEOUT_MS = 90_000;
@@ -64,6 +103,12 @@ const STAGE_MESSAGES_RECOMMEND = [
   "AI でレシピを探しています…",
   "良さそうな候補をまとめています…",
   "サムネイル画像を取得しています…",
+];
+
+const STAGE_MESSAGES_IDENTIFY = [
+  "写真を解析しています…",
+  "食材・料理を特定しています…",
+  "解説をまとめ、レシピを探しています…",
 ];
 
 export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
@@ -85,6 +130,9 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
   const [recommendations, setRecommendations] = useState<RecipeRecommendation[]>(
     [],
   );
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [identified, setIdentified] = useState<IdentifyResult | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const stageTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -101,6 +149,9 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
       setAiQuery("");
       setPendingUrl(null);
       setRecommendations([]);
+      setImageFile(null);
+      setImagePreview(null);
+      setIdentified(null);
       setMode("url");
       setLoadingCount(0);
     }
@@ -175,6 +226,90 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
           : err instanceof Error
             ? err.message
             : "検索に失敗しました",
+      );
+      setStep("input");
+    } finally {
+      clearTimeout(timeout);
+      stopStageMessages();
+      setBusy(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // 写真から解説 + レシピ検索
+  // -----------------------------------------------------------------------
+  const handleFile = (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("画像ファイルを選んでください");
+      return;
+    }
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setImagePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const identifyAndRecommend = async () => {
+    if (!imageFile) {
+      toast.error("写真を選んでください");
+      return;
+    }
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    // 解析 + 検索の 2 段階ぶん余裕を持たせる
+    const timeout = setTimeout(
+      () => controller.abort(),
+      RECOMMEND_TIMEOUT_MS + 30_000,
+    );
+
+    setBusy(true);
+    setIdentified(null);
+    setRecommendations([]);
+    setStep("loading");
+    setPendingUrl(null);
+    setLoadingCount(1);
+    startStageMessages(STAGE_MESSAGES_IDENTIFY);
+    try {
+      const { data, mediaType } = await fileToResizedBase64(imageFile);
+      const idRes = await fetch("/api/recipes/identify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: data, mediaType }),
+        signal: controller.signal,
+      });
+      const idData = (await idRes.json()) as
+        | IdentifyResponse
+        | { error: string };
+      if ("error" in idData) throw new Error(idData.error);
+      setIdentified(idData.result);
+
+      // 解説が出来たらレシピ検索へ
+      setStageIndex(STAGE_MESSAGES_IDENTIFY.length - 1);
+      const recRes = await fetch("/api/recipes/recommend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: idData.result.recipe_query || idData.result.name,
+        }),
+        signal: controller.signal,
+      });
+      const recData = (await recRes.json()) as
+        | RecipeRecommendResponse
+        | { error: string };
+      if (!("error" in recData)) {
+        setRecommendations(recData.recommendations);
+      }
+      setStep("recommendations");
+    } catch (err) {
+      const isAbort = err instanceof DOMException && err.name === "AbortError";
+      toast.error(
+        isAbort
+          ? "時間がかかりすぎたため中断しました。もう一度お試しください"
+          : err instanceof Error
+            ? err.message
+            : "写真の解析に失敗しました",
       );
       setStep("input");
     } finally {
@@ -376,17 +511,23 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
         {/* ===== input ===== */}
         {step === "input" && (
           <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
-            <TabsList className="grid grid-cols-2 w-full">
+            <TabsList className="grid grid-cols-3 w-full">
               <TabsTrigger value="url">
                 <span className="flex items-center justify-center gap-1.5">
                   <Globe className="w-3.5 h-3.5" />
-                  URL から取り込む
+                  URL
                 </span>
               </TabsTrigger>
               <TabsTrigger value="ai">
                 <span className="flex items-center justify-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5" />
-                  レシピを探す
+                  探す
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="photo">
+                <span className="flex items-center justify-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5" />
+                  写真
                 </span>
               </TabsTrigger>
             </TabsList>
@@ -505,15 +646,87 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
                 </Button>
               </DialogFooter>
             </TabsContent>
+
+            <TabsContent value="photo" className="mt-4 space-y-4">
+              <div className="space-y-2">
+                <Label>食材や料理の写真</Label>
+                <p className="text-xs text-muted-foreground">
+                  市場やスーパーで見つけた食材・料理の写真をアップすると、それが何かを解説して、合うレシピも探します
+                </p>
+                {imagePreview ? (
+                  <div className="relative">
+                    <img
+                      src={imagePreview}
+                      alt="アップロードした写真"
+                      className="w-full max-h-64 object-contain rounded-lg border bg-muted"
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="secondary"
+                      onClick={() => {
+                        setImageFile(null);
+                        setImagePreview(null);
+                      }}
+                      disabled={busy}
+                      aria-label="写真を削除"
+                      className="absolute top-2 right-2 h-7 w-7 rounded-full shadow"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg py-10 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <Camera className="w-8 h-8 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      タップして写真を選ぶ
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={busy}
+                      onChange={(e) => {
+                        handleFile(e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+              <DialogFooter className="pt-1">
+                <Button
+                  onClick={identifyAndRecommend}
+                  disabled={busy || !imageFile}
+                  className="gap-1.5"
+                >
+                  {busy ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                  {busy ? "解析しています..." : "解説してレシピを探す"}
+                </Button>
+              </DialogFooter>
+            </TabsContent>
           </Tabs>
         )}
 
         {/* ===== recommendations ===== */}
         {step === "recommendations" && (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              気になるレシピをタップして元サイトを開いたり、「作ってみる」で取り込めます
-            </p>
+            {identified && <IdentifiedPanel info={identified} />}
+            {recommendations.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {identified
+                  ? "関連するレシピは見つかりませんでした。"
+                  : "条件に合うレシピが見つかりませんでした。"}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                気になるレシピをタップして元サイトを開いたり、「作ってみる」で取り込めます
+              </p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {recommendations.map((r, i) => {
                 const host = (() => {
@@ -669,5 +882,64 @@ export function AddRecipeDialog({ open, onOpenChange }: AddRecipeDialogProps) {
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function IdentifiedPanel({ info }: { info: IdentifyResult }) {
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-4 space-y-3">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
+            <h3 className="text-lg font-bold leading-tight">{info.name}</h3>
+            {info.name_en && (
+              <span className="text-xs text-muted-foreground">
+                {info.name_en}
+              </span>
+            )}
+            {info.name_vi && (
+              <Badge variant="secondary" className="text-[10px] font-normal">
+                {info.name_vi}
+              </Badge>
+            )}
+          </div>
+          {info.confidence && (
+            <p className="text-xs text-muted-foreground">{info.confidence}</p>
+          )}
+        </div>
+        {info.kind && <InfoRow label="種類" text={info.kind} />}
+        {info.origin && <InfoRow label="これは何?" text={info.origin} />}
+        {info.taste_profile && (
+          <InfoRow label="味の特徴" text={info.taste_profile} />
+        )}
+        {info.pairings.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-primary">合う食材・料理</p>
+            <ul className="space-y-1 text-sm leading-relaxed">
+              {info.pairings.map((p, i) => (
+                <li key={i} className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="font-medium text-foreground">{p.food}</span>
+                  {p.reason && (
+                    <span className="text-xs text-muted-foreground">
+                      {p.reason}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function InfoRow({ label, text }: { label: string; text: string }) {
+  return (
+    <div className="space-y-0.5">
+      <p className="text-xs font-semibold text-primary">{label}</p>
+      <p className="text-sm leading-relaxed text-foreground/90">{text}</p>
+    </div>
   );
 }
