@@ -1,17 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
-import {
-  BookOpen,
-  Settings,
-  Sun,
-  Moon,
-  FileText,
-  Dumbbell,
-  Scale,
-} from "lucide-react";
+import { BookOpen, LogOut } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -25,16 +17,13 @@ import {
   SidebarRail,
   AppSwitcher,
   GO_APPS,
-  UserMenu,
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
 } from "@takaki/go-design-system";
 
 const navItems = [
   { href: "/recipes", icon: BookOpen, label: "レシピ" },
-];
-
-const miniMenuItems = [
-  { href: "/training", icon: Dumbbell, label: "トレーニング" },
-  { href: "/body", icon: Scale, label: "ボディ" },
 ];
 
 function isActive(href: string, pathname: string) {
@@ -43,8 +32,6 @@ function isActive(href: string, pathname: string) {
 
 export function CookGoSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const [isDark, setIsDark] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -63,22 +50,7 @@ export function CookGoSidebar() {
         setAvatarUrl(user.user_metadata?.avatar_url || "");
       });
     });
-    const update = () =>
-      setIsDark(document.documentElement.classList.contains("dark"));
-    update();
-    const obs = new MutationObserver(update);
-    obs.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-    return () => obs.disconnect();
   }, []);
-
-  function toggleTheme() {
-    const next = isDark ? "light" : "dark";
-    localStorage.setItem("theme", next);
-    document.documentElement.classList.toggle("dark", next === "dark");
-  }
 
   async function handleSignOut() {
     const { createClient } = await import("@/lib/supabase/client");
@@ -119,56 +91,32 @@ export function CookGoSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {/* minimenu（PhysicalGoから引き継いだボディ管理） */}
-        <SidebarGroup className="mt-auto">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {miniMenuItems.map(({ href, icon: Icon, label }) => (
-                <SidebarMenuItem key={href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(href, pathname)}
-                  >
-                    <Link href={href}>
-                      <Icon className="h-4 w-4 shrink-0" />
-                      {label}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
 
-      {/* フッター */}
+      {/* フッター：ユーザー情報 + ログアウト */}
       <SidebarFooter>
-        <UserMenu
-          displayName={displayName || "—"}
-          email={email}
-          avatarUrl={avatarUrl}
-          items={[
-            {
-              title: "コンセプト",
-              icon: FileText,
-              onSelect: () => router.push("/concept"),
-              isActive: pathname.startsWith("/concept"),
-            },
-            {
-              title: "設定",
-              icon: Settings,
-              onSelect: () => router.push("/settings"),
-              isActive: pathname.startsWith("/settings"),
-            },
-            {
-              title: isDark ? "ダーク" : "ライト",
-              icon: isDark ? Moon : Sun,
-              onSelect: toggleTheme,
-            },
-          ]}
-          signOut={{ onSelect: handleSignOut }}
-        />
+        <div className="flex items-center gap-2 px-2 py-1.5">
+          <Avatar className="h-8 w-8 shrink-0">
+            <AvatarImage src={avatarUrl} alt={displayName} />
+            <AvatarFallback>{(displayName || "?").slice(0, 1)}</AvatarFallback>
+          </Avatar>
+          <div className="flex min-w-0 flex-col text-sm">
+            <span className="truncate font-medium">{displayName || "—"}</span>
+            {email && (
+              <span className="truncate text-xs text-muted-foreground">
+                {email}
+              </span>
+            )}
+          </div>
+        </div>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={handleSignOut}>
+              <LogOut className="h-4 w-4 shrink-0" />
+              ログアウト
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
 
       <SidebarRail />
