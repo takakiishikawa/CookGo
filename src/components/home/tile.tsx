@@ -23,8 +23,8 @@ export function Tile({
 }: TileProps) {
   const isMobile = useIsMobile();
   const heightPx = isMobile
-    ? 96 + (heightIndex % 3) * 26
-    : 130 + (heightIndex % 3) * 34;
+    ? 130 + (heightIndex % 3) * 32
+    : 175 + (heightIndex % 3) * 42;
 
   return (
     <div

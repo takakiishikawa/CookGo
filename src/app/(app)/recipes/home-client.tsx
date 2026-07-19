@@ -7,6 +7,7 @@ import { DiscoverSection } from "@/components/home/discover-section";
 import { KitchenSection } from "@/components/home/kitchen-section";
 import { AddRecipeCard } from "@/components/recipe/add-recipe-card";
 import { RecipeEditSheet } from "@/components/recipe/recipe-edit-sheet";
+import { ShoppingListDialog } from "@/components/recipe/shopping-list-dialog";
 import type {
   DiscoverItem,
   DiscoverTabId,
@@ -26,6 +27,7 @@ export function HomeClient({ recipes, discoverItems }: HomeClientProps) {
   const [expandedTileId, setExpandedTileId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
+  const [shoppingRecipe, setShoppingRecipe] = useState<Recipe | null>(null);
   // stable per mount; re-randomizes on the next visit/reload, matching the
   // "shuffled every visit" behavior from the design spec
   const [visitSeed] = useState(() => Math.random());
@@ -57,6 +59,7 @@ export function HomeClient({ recipes, discoverItems }: HomeClientProps) {
             }}
             expandedTileId={expandedTileId}
             onToggleExpand={toggleExpand}
+            onOpenShopping={setShoppingRecipe}
             visitSeed={visitSeed}
           />
         ) : (
@@ -70,6 +73,7 @@ export function HomeClient({ recipes, discoverItems }: HomeClientProps) {
             expandedTileId={expandedTileId}
             onToggleExpand={toggleExpand}
             onEdit={setEditingRecipe}
+            onOpenShopping={setShoppingRecipe}
             onAddRecipe={() => setAddOpen(true)}
           />
         )}
@@ -82,6 +86,12 @@ export function HomeClient({ recipes, discoverItems }: HomeClientProps) {
           if (!o) setEditingRecipe(null);
         }}
         onDeleted={() => setEditingRecipe(null)}
+      />
+      <ShoppingListDialog
+        recipe={shoppingRecipe}
+        onOpenChange={(o) => {
+          if (!o) setShoppingRecipe(null);
+        }}
       />
     </div>
   );

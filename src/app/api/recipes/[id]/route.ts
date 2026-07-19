@@ -1,7 +1,46 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { DB_SCHEMA } from "@/lib/constants";
-import { MAIN_INGREDIENT_TAGS } from "@/types/database";
+import { MAIN_INGREDIENT_TAGS, type Recipe } from "@/types/database";
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { data, error } = await supabase
+      .schema(DB_SCHEMA)
+      .from("recipes")
+      .select("*")
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .single();
+    if (error || !data)
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    return NextResponse.json({ recipe: data as Recipe });
+  } catch (error) {
+    console.error("recipe GET error:", error);
+    const detail =
+      error instanceof Error
+        ? error.message
+        : typeof error === "object" && error !== null
+          ? JSON.stringify(error)
+          : String(error);
+    return NextResponse.json(
+      { error: `取得に失敗しました: ${detail}` },
+      { status: 500 },
+    );
+  }
+}
 
 export async function PATCH(
   request: Request,

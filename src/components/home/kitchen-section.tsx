@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { UtensilsCrossed } from "lucide-react";
 import { EmptyState } from "@takaki/go-design-system";
 import type { MainIngredientTag, Recipe } from "@/types/database";
@@ -17,6 +16,7 @@ interface KitchenSectionProps {
   expandedTileId: string | null;
   onToggleExpand: (id: string) => void;
   onEdit: (recipe: Recipe) => void;
+  onOpenShopping: (recipe: Recipe) => void;
   onAddRecipe: () => void;
 }
 
@@ -27,10 +27,9 @@ export function KitchenSection({
   expandedTileId,
   onToggleExpand,
   onEdit,
+  onOpenShopping,
   onAddRecipe,
 }: KitchenSectionProps) {
-  const router = useRouter();
-
   const filtered = useMemo(
     () =>
       category === null
@@ -70,9 +69,7 @@ export function KitchenSection({
               <RecipeTileOverlay
                 variant="kitchen"
                 visible={expandedTileId === recipe.id}
-                onShoppingClick={() =>
-                  router.push(`/recipes/${recipe.id}/shopping`)
-                }
+                onShoppingClick={() => onOpenShopping(recipe)}
                 youtubeHref={youtubeSearchUrl(recipe.title)}
                 sourceHref={recipe.source_url ?? undefined}
                 onEdit={() => onEdit(recipe)}

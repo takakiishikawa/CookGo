@@ -7,6 +7,7 @@ import type { DiscoverItem, DiscoverTabId, Recipe } from "@/types/database";
 import { seededShuffle } from "@/lib/seeded-shuffle";
 import { youtubeSearchUrl } from "@/lib/recipe-links";
 import { saveDiscoverItem } from "@/lib/save-discover-item";
+import { fetchRecipe } from "@/lib/fetch-recipe";
 import { DiscoverTabs } from "@/components/home/discover-tabs";
 import { Tile } from "@/components/home/tile";
 import { RecipeTileOverlay } from "@/components/recipe/recipe-tile-overlay";
@@ -18,6 +19,7 @@ interface DiscoverSectionProps {
   onTabChange: (tab: DiscoverTabId) => void;
   expandedTileId: string | null;
   onToggleExpand: (id: string) => void;
+  onOpenShopping: (recipe: Recipe) => void;
   visitSeed: number;
 }
 
@@ -28,6 +30,7 @@ export function DiscoverSection({
   onTabChange,
   expandedTileId,
   onToggleExpand,
+  onOpenShopping,
   visitSeed,
 }: DiscoverSectionProps) {
   const router = useRouter();
@@ -64,7 +67,9 @@ export function DiscoverSection({
     setSavingId(item.id);
     try {
       const { recipeId } = await saveDiscoverItem(item.source_url);
-      router.push(`/recipes/${recipeId}/shopping`);
+      const recipe = await fetchRecipe(recipeId);
+      onOpenShopping(recipe);
+      router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "保存に失敗しました");
     } finally {
