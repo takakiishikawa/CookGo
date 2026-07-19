@@ -14,7 +14,7 @@ export default function LoginRoute() {
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://cook-go-lovat.vercel.app").replace(/\/$/, "")}/auth/callback`,
+        redirectTo: `${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://home-cook-lovat.vercel.app").replace(/\/$/, "")}/auth/callback`,
         scopes: "email profile",
       },
     });
