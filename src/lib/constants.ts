@@ -1,6 +1,6 @@
-export const DB_SCHEMA = "cookgo" as const;
+export const DB_SCHEMA = "homecook" as const;
 
-export const WIKI_USER_AGENT = "CookGo/1.0 (https://cook-go.vercel.app)";
+export const WIKI_USER_AGENT = "HomeCook/1.0 (https://cook-go-lovat.vercel.app)";
 
 // 最新世代モデル(2026-05時点)
 // Sonnet 4 系は 2026-06 に EOL のため Sonnet 4.6 に移行
