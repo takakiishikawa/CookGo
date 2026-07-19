@@ -1,7 +1,7 @@
 "use client";
 
-import { ChefHat } from "lucide-react";
 import { LoginPage } from "@takaki/go-design-system";
+import { ChefHatIcon } from "@/components/brand/chef-hat-icon";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginRoute() {
@@ -18,8 +18,8 @@ export default function LoginRoute() {
 
   return (
     <LoginPage
-      productName="CookGo"
-      productLogo={<ChefHat className="h-7 w-7" />}
+      productName="HomeCook"
+      productLogo={<ChefHatIcon size={28} className="text-primary" />}
       tagline="料理を楽しむためのレシピ管理アプリ。"
       onGoogleSignIn={handleGoogleSignIn}
     />

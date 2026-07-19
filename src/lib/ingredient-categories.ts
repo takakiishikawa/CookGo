@@ -16,6 +16,12 @@ export const INGREDIENT_GROUP_LABELS: Record<IngredientGroup, string> = {
   seasoning: "調味料・その他",
 };
 
+export const INGREDIENT_GROUP_LABELS_EN: Record<IngredientGroup, string> = {
+  main: "Main",
+  vegetable: "Vegetables",
+  seasoning: "Seasoning & Others",
+};
+
 const GROUP_ORDER: IngredientGroup[] = ["main", "vegetable", "seasoning"];
 
 function categoryToGroup(category: string | null | undefined): IngredientGroup {
@@ -278,6 +284,7 @@ export function inferCategoryFromName(
 /** ingredients を 3 グループに分けて、空グループは除外して返す。順序は固定。 */
 export function groupIngredients(
   ingredients: RecipeIngredient[],
+  labels: Record<IngredientGroup, string> = INGREDIENT_GROUP_LABELS,
 ): GroupedIngredients[] {
   const buckets: Record<IngredientGroup, GroupedIngredients["items"]> = {
     main: [],
@@ -290,6 +297,6 @@ export function groupIngredients(
   return GROUP_ORDER.flatMap((g) =>
     buckets[g].length === 0
       ? []
-      : [{ group: g, label: INGREDIENT_GROUP_LABELS[g], items: buckets[g] }],
+      : [{ group: g, label: labels[g], items: buckets[g] }],
   );
 }

@@ -13,6 +13,21 @@ export const MAIN_INGREDIENT_TAG_ICON: Record<MainIngredientTag, LucideIcon> = {
   "つまみ・副菜": Salad,
 };
 
+/** Your Kitchen のカテゴリチップ。主食材タグの英語表示ラベル */
+export const KITCHEN_CATEGORIES: {
+  tag: MainIngredientTag | null;
+  label: string;
+}[] = [
+  { tag: null, label: "All" },
+  { tag: "魚", label: "Fish" },
+  { tag: "鳥", label: "Poultry" },
+  { tag: "豚", label: "Pork" },
+  { tag: "牛", label: "Beef" },
+  { tag: "麺", label: "Noodles" },
+  { tag: "スープ", label: "Soup" },
+  { tag: "つまみ・副菜", label: "Sides" },
+];
+
 // 絵文字一般 + 国旗 (Regional Indicator) + 装飾系を網羅
 const EMOJI_PATTERN =
   /[\u{1F1E6}-\u{1F1FF}\u{2600}-\u{27BF}\u{1F300}-\u{1F9FF}\u{1FA70}-\u{1FAFF}‍️]/gu;

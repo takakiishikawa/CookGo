@@ -191,3 +191,26 @@ export interface Staple {
   sort_order: number;
   created_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Discover feed（AI web-search-backed, weekly-rotating dish pool）
+// ---------------------------------------------------------------------------
+
+export const DISCOVER_TAB_IDS = [
+  "for_you",
+  "quick",
+  "new_flavors",
+  "seasonal",
+] as const;
+export type DiscoverTabId = (typeof DISCOVER_TAB_IDS)[number];
+
+export interface DiscoverItem {
+  id: string;
+  tab_id: DiscoverTabId;
+  title: string;
+  image_url: string | null;
+  source_url: string;
+  week_key: string;
+  is_active: boolean;
+  created_at: string;
+}

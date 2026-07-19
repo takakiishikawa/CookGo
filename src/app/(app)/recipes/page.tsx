@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { RecipesClient } from "./recipes-client";
+import { HomeClient } from "./home-client";
 
 export default async function RecipesPage() {
   const supabase = await createClient();
@@ -10,18 +10,10 @@ export default async function RecipesPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/");
 
-  const [recipes, staples, inventory] = await Promise.all([
+  const [recipes, discoverItems] = await Promise.all([
     db.recipes.getAll(supabase, user.id),
-    db.staples.getAll(supabase, user.id),
-    db.inventory.getAll(supabase, user.id),
+    db.discover.getActive(supabase),
   ]);
 
-  return (
-    <RecipesClient
-      recipes={recipes}
-      staples={staples}
-      inventory={inventory}
-      userId={user.id}
-    />
-  );
+  return <HomeClient recipes={recipes} discoverItems={discoverItems} />;
 }

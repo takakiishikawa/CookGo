@@ -5,15 +5,32 @@
 /* class-based dark mode: responds to .dark on <html> */
 @variant dark (&:where(.dark, .dark *));
 
-/* CookGo primary color — fresh green evoking wholesome ingredients and healthy eating */
+/* HomeCook primary color — warm terracotta evoking home cooking */
 :root {
-  --color-primary: #16a34a;
-  --color-primary-hover: #15803d;
+  --color-primary: oklch(56% 0.15 35);
+  --color-primary-hover: oklch(49% 0.14 35);
+  --color-primary-text: #ffffff;
+
+  /* warm cream surfaces (background < surface-subtle < surface < surface-elevated) */
+  --color-background: oklch(97% 0.015 70);
+  --color-surface-subtle: oklch(96% 0.013 70);
+  --color-surface: #ffffff;
+  --color-surface-elevated: oklch(98% 0.01 70);
+
+  /* warm neutral text */
+  --color-text-primary: oklch(24% 0.02 50);
+  --color-text-secondary: oklch(48% 0.02 50);
+  --color-text-subtle: oklch(55% 0.02 50);
+
+  /* warm borders */
+  --color-border-default: oklch(88% 0.015 70);
+  --color-border-subtle: oklch(92% 0.012 70);
 }
 
 /* font settings */
 @theme inline {
-  --font-sans: var(--font-noto-sans-jp), -apple-system, sans-serif;
+  --font-sans: var(--font-inter), var(--font-noto-sans-jp), -apple-system, sans-serif;
+  --font-serif: var(--font-lora), serif;
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 

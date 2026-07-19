@@ -2,14 +2,14 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "CookGo",
-    short_name: "CookGo",
+    name: "HomeCook",
+    short_name: "HomeCook",
     description: "料理を楽しむためのレシピ管理アプリ",
     start_url: "/recipes",
     id: "/recipes",
     display: "standalone",
-    background_color: "#ffffff",
-    theme_color: "#10b981",
+    background_color: "#fdf9f4",
+    theme_color: "#b5502e",
     orientation: "portrait",
     categories: ["food", "health", "lifestyle"],
     icons: [

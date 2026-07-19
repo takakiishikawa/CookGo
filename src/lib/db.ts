@@ -1,6 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DB_SCHEMA } from "./constants";
-import type { InventoryItem, Recipe, Staple } from "@/types/database";
+import type {
+  DiscoverItem,
+  DiscoverTabId,
+  InventoryItem,
+  Recipe,
+  Staple,
+} from "@/types/database";
 
 function s(supabase: SupabaseClient) {
   return supabase.schema(DB_SCHEMA);
@@ -104,6 +110,28 @@ export const db = {
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true });
       return (data ?? []) as InventoryItem[];
+    },
+  },
+  discover: {
+    getActive: async (supabase: SupabaseClient): Promise<DiscoverItem[]> => {
+      const { data } = await s(supabase)
+        .from("discover_items")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
+      return (data ?? []) as DiscoverItem[];
+    },
+    getActiveByTab: async (
+      supabase: SupabaseClient,
+      tabId: DiscoverTabId,
+    ): Promise<DiscoverItem[]> => {
+      const { data } = await s(supabase)
+        .from("discover_items")
+        .select("*")
+        .eq("is_active", true)
+        .eq("tab_id", tabId)
+        .order("created_at", { ascending: true });
+      return (data ?? []) as DiscoverItem[];
     },
   },
 };
