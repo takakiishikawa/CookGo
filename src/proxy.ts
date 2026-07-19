@@ -31,7 +31,16 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  if (!user && pathname !== "/" && !pathname.startsWith("/auth")) {
+  // Cron/webhook 系ルートはユーザーセッションを持たない (CRON_SECRET 等で
+  // 各ルート自身が認証する) ため、この Cookie ベースの認証ガードから除外する
+  const isSystemRoute = pathname.startsWith("/api/discover/refresh");
+
+  if (
+    !user &&
+    pathname !== "/" &&
+    !pathname.startsWith("/auth") &&
+    !isSystemRoute
+  ) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
