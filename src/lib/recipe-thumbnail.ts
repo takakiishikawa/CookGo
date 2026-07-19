@@ -21,7 +21,10 @@ export async function fetchRecipeThumbnail(
   url: string,
 ): Promise<string | null> {
   const fetched = await fetchHtml(url);
-  if (!fetched.ok || !fetched.html) return null;
+  if (!fetched.ok || !fetched.html) {
+    console.warn("fetchRecipeThumbnail: fetch failed", url, fetched.reason);
+    return null;
+  }
 
   const extracted = extractFromHtml(fetched.html);
   const candidates = [extracted.recipeImage, extracted.ogImage];
@@ -29,6 +32,10 @@ export async function fetchRecipeThumbnail(
   for (const candidate of candidates) {
     if (isLikelyPhoto(candidate)) return resolveUrl(url, candidate);
   }
+  console.warn("fetchRecipeThumbnail: no usable image", url, {
+    recipeImage: extracted.recipeImage,
+    ogImage: extracted.ogImage,
+  });
   return null;
 }
 
