@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { CLAUDE_SONNET } from "@/lib/constants";
-import { fetchOgImage } from "@/lib/og-image";
+import { fetchRecipeThumbnail } from "@/lib/recipe-thumbnail";
 
 const client = new Anthropic({ maxRetries: 0 });
 
@@ -106,10 +106,11 @@ features の書き方(各レシピを **ぱっと見で差別化** するため)
     }))
     .filter((r) => r.title && r.url.startsWith("http"));
 
-  // 各 URL から og:image を並列取得(個別タイムアウトは og-image 内で 8 秒)
+  // 各 URL から料理写真を並列取得。JSON-LD Recipe.image を優先し、
+  // ロゴ/バナーらしき画像は弾く(fetchRecipeThumbnail 参照)
   return Promise.all(
     cleaned.map(async (r): Promise<RecipeRecommendation> => {
-      const thumbnail = await fetchOgImage(r.url);
+      const thumbnail = await fetchRecipeThumbnail(r.url);
       return { ...r, thumbnail };
     }),
   );

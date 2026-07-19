@@ -84,10 +84,10 @@ export function DiscoverSection({
         {tiles.map((item, i) => (
           <Tile
             key={item.id}
+            id={item.id}
             label={item.title}
             imageUrl={item.image_url}
             tintIndex={i}
-            heightIndex={i}
             onClick={() => onToggleExpand(item.id)}
           >
             <RecipeTileOverlay

@@ -8,6 +8,8 @@ export interface ExtractedHtml {
   title: string | null;
   ogImage: string | null;
   jsonLdRecipe: unknown | null;
+  /** JSON-LD Recipe.image から抽出した、料理そのものの写真(最も信頼できる画像ソース) */
+  recipeImage: string | null;
   /** JSON-LD の recipeInstructions[].image から抽出したステップ画像 URL の配列 (順序通り) */
   stepImages: string[];
   bodyText: string;
@@ -19,9 +21,37 @@ export function extractFromHtml(html: string): ExtractedHtml {
     title: extractTitle(html),
     ogImage: extractOgImage(html),
     jsonLdRecipe,
+    recipeImage: extractRecipeImage(jsonLdRecipe),
     stepImages: extractStepImagesFromJsonLd(jsonLdRecipe),
     bodyText: extractBodyText(html),
   };
+}
+
+/**
+ * JSON-LD Recipe.image から料理写真の URL を取り出す。
+ * サイトのロゴ/バナーになりがちな og:image より信頼できる一次ソース。
+ * string / string[] / ImageObject / ImageObject[] のいずれの形にも対応。
+ */
+function extractRecipeImage(recipe: unknown): string | null {
+  if (!recipe || typeof recipe !== "object") return null;
+  const img = (recipe as Record<string, unknown>).image;
+  return firstImageUrl(img);
+}
+
+function firstImageUrl(img: unknown): string | null {
+  if (typeof img === "string") return img;
+  if (Array.isArray(img)) {
+    for (const item of img) {
+      const url = firstImageUrl(item);
+      if (url) return url;
+    }
+    return null;
+  }
+  if (img && typeof img === "object" && "url" in img) {
+    const u = (img as { url?: unknown }).url;
+    return typeof u === "string" ? u : null;
+  }
+  return null;
 }
 
 /**

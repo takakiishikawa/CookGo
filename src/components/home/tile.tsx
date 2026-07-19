@@ -5,26 +5,43 @@ import { useIsMobile } from "@takaki/go-design-system";
 import { dishTint } from "@/lib/dish-tint";
 
 interface TileProps {
+  id: string;
   label: string;
   imageUrl: string | null;
   tintIndex: number;
-  heightIndex: number;
   onClick: () => void;
   children: React.ReactNode;
 }
 
+const HEIGHT_BUCKETS = 5;
+
+/**
+ * Height bucket derived from a hash of the tile's own id, not its position
+ * in the list. A positional `index % n` cycle can alias with the column
+ * count (e.g. 12 items / 4 columns landing exactly on whole multiples of a
+ * 3-cycle) and make every column end up with an identical height sequence,
+ * which reads as a plain uniform grid instead of a staggered masonry.
+ * Hashing the id avoids any such correlation with layout/ordering.
+ */
+function heightBucket(id: string): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  return hash % HEIGHT_BUCKETS;
+}
+
 export function Tile({
+  id,
   label,
   imageUrl,
   tintIndex,
-  heightIndex,
   onClick,
   children,
 }: TileProps) {
   const isMobile = useIsMobile();
-  const heightPx = isMobile
-    ? 130 + (heightIndex % 3) * 32
-    : 175 + (heightIndex % 3) * 42;
+  const bucket = heightBucket(id);
+  const heightPx = isMobile ? 120 + bucket * 24 : 160 + bucket * 32;
 
   return (
     <div

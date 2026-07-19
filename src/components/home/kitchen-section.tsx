@@ -60,10 +60,10 @@ export function KitchenSection({
           {filtered.map((recipe, i) => (
             <Tile
               key={recipe.id}
+              id={recipe.id}
               label={recipe.title}
               imageUrl={recipe.image_url}
               tintIndex={i * 3 + 1}
-              heightIndex={i}
               onClick={() => onToggleExpand(recipe.id)}
             >
               <RecipeTileOverlay
