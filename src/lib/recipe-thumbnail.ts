@@ -4,7 +4,7 @@ import { extractFromHtml, fetchHtml } from "@/lib/html-extract";
 const BAD_IMAGE_PATTERNS =
   /(^|[/_-])(logo|banner|ad|ads|advert|sprite|icon|placeholder|noimage|no-image|og-default|default[-_]?image)([/_.-]|$)/i;
 
-function isLikelyPhoto(url: string | null): url is string {
+export function isLikelyPhoto(url: string | null | undefined): url is string {
   if (!url) return false;
   if (/\.svg(\?|$)/i.test(url)) return false;
   if (BAD_IMAGE_PATTERNS.test(url)) return false;

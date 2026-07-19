@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { CLAUDE_SONNET } from "@/lib/constants";
-import { fetchRecipeThumbnail } from "@/lib/recipe-thumbnail";
+import { fetchRecipeThumbnail, isLikelyPhoto } from "@/lib/recipe-thumbnail";
 
 const client = new Anthropic({ maxRetries: 0 });
 
@@ -39,7 +39,8 @@ ${topic}
       "title": "料理名(日本語)",
       "url": "https://...",
       "summary": "1〜2文の概要",
-      "features": ["短いタグ1", "短いタグ2", "短いタグ3"]
+      "features": ["短いタグ1", "短いタグ2", "短いタグ3"],
+      "image": "完成した料理そのものの写真URL(検索結果ページから見つかれば。ロゴ/バナー/広告画像は不可。見つからなければ null)"
     }
   ]
 }
@@ -88,6 +89,7 @@ features の書き方(各レシピを **ぱっと見で差別化** するため)
       url?: unknown;
       summary?: unknown;
       features?: unknown;
+      image?: unknown;
     }>;
   };
   const list = Array.isArray(parsed.recipes) ? parsed.recipes : [];
@@ -103,14 +105,19 @@ features の書き方(各レシピを **ぱっと見で差別化** するため)
             .filter(Boolean)
             .slice(0, 4)
         : [],
+      claudeImage: typeof r.image === "string" ? r.image.trim() : null,
     }))
     .filter((r) => r.title && r.url.startsWith("http"));
 
-  // 各 URL から料理写真を並列取得。JSON-LD Recipe.image を優先し、
-  // ロゴ/バナーらしき画像は弾く(fetchRecipeThumbnail 参照)
+  // Claude が web 検索中に見つけた画像 URL を優先(サーバー側フェッチは
+  // kurashiru / delishkitchen / Nadia 等、データセンター IP からの
+  // アクセスを 404 でブロックするサイトが多く失敗しがちなため)。
+  // 無ければ fetchRecipeThumbnail で改めてページを取得してフォールバック
   return Promise.all(
-    cleaned.map(async (r): Promise<RecipeRecommendation> => {
-      const thumbnail = await fetchRecipeThumbnail(r.url);
+    cleaned.map(async ({ claudeImage, ...r }): Promise<RecipeRecommendation> => {
+      const thumbnail = isLikelyPhoto(claudeImage)
+        ? claudeImage
+        : await fetchRecipeThumbnail(r.url);
       return { ...r, thumbnail };
     }),
   );
