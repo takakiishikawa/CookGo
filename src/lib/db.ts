@@ -114,11 +114,12 @@ export const db = {
   },
   discover: {
     getActive: async (supabase: SupabaseClient): Promise<DiscoverItem[]> => {
-      const { data } = await s(supabase)
+      const { data, error } = await s(supabase)
         .from("discover_items")
         .select("*")
         .eq("is_active", true)
         .order("created_at", { ascending: false });
+      if (error) console.error("db.discover.getActive error:", error);
       return (data ?? []) as DiscoverItem[];
     },
     getActiveByTab: async (
