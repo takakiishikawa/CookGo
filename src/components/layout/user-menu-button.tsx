@@ -63,17 +63,26 @@ export function UserMenuButton() {
           </Avatar>
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={8} className="min-w-56">
-        <DropdownMenuLabel className="flex flex-col gap-0.5 font-normal">
-          <span className="font-semibold truncate">{displayName || "—"}</span>
+      <DropdownMenuContent
+        align="end"
+        sideOffset={10}
+        className="rounded-2xl border-[oklch(88%_0.015_70)] bg-[oklch(98%_0.01_70)] p-1.5 min-w-56 shadow-lg"
+      >
+        <DropdownMenuLabel className="flex flex-col gap-0.5 px-2.5 pt-1.5 pb-2 font-normal">
+          <span className="font-semibold text-[oklch(24%_0.02_50)] truncate">
+            {displayName || "—"}
+          </span>
           {email && (
-            <span className="text-xs text-muted-foreground truncate">
+            <span className="text-xs text-[oklch(55%_0.02_50)] truncate">
               {email}
             </span>
           )}
         </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={handleSignOut} className="gap-2">
+        <DropdownMenuSeparator className="bg-[oklch(90%_0.013_70)] mb-1" />
+        <DropdownMenuItem
+          onSelect={handleSignOut}
+          className="rounded-lg px-2.5 py-2 gap-2.5 text-[13px] font-medium text-[oklch(24%_0.02_50)] focus:bg-[oklch(93%_0.015_70)] focus:text-[oklch(24%_0.02_50)]"
+        >
           <LogOut className="w-4 h-4" />
           ログアウト
         </DropdownMenuItem>

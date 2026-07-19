@@ -33,7 +33,7 @@ export async function proxy(request: NextRequest) {
 
   // Cron/webhook 系ルートはユーザーセッションを持たない (CRON_SECRET 等で
   // 各ルート自身が認証する) ため、この Cookie ベースの認証ガードから除外する
-  const isSystemRoute = pathname.startsWith("/api/discover/refresh");
+  const isSystemRoute = pathname.startsWith("/api/discover/");
 
   if (
     !user &&

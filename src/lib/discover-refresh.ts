@@ -1,6 +1,7 @@
 import { getISOWeek, getISOWeekYear } from "date-fns";
 import { DB_SCHEMA } from "@/lib/constants";
 import { searchRecipes } from "@/lib/recipe-recommend";
+import { fetchRecipeThumbnail } from "@/lib/recipe-thumbnail";
 import { createServiceClient } from "@/lib/supabase/service";
 import { DISCOVER_TAB_IDS, type DiscoverTabId } from "@/types/database";
 
@@ -115,4 +116,45 @@ export async function refreshDiscoverFeed(
   const tabs = onlyTab ? [onlyTab] : DISCOVER_TAB_IDS;
   const results = await Promise.all(tabs.map((t) => refreshTab(t)));
   return { week_key: currentWeekKey(), results };
+}
+
+/**
+ * 既に image_url が入っている行は触らず、null の行だけ
+ * fetchRecipeThumbnail で再取得する一回限りのメンテナンス処理。
+ * AI 呼び出しは発生しない(HTTP フェッチのみ)。
+ */
+export async function backfillMissingDiscoverImages(): Promise<{
+  checked: number;
+  updated: number;
+}> {
+  const supabase = createServiceClient();
+  const table = supabase.schema(DB_SCHEMA).from("discover_items");
+
+  const { data } = await table
+    .select("id, source_url")
+    .eq("is_active", true)
+    .is("image_url", null);
+
+  const rows = (data ?? []) as { id: string; source_url: string }[];
+  if (rows.length === 0) return { checked: 0, updated: 0 };
+
+  const results = await Promise.all(
+    rows.map(async (row) => {
+      const thumbnail = await fetchRecipeThumbnail(row.source_url);
+      if (!thumbnail) return false;
+      const { error } = await table
+        .update({ image_url: thumbnail })
+        .eq("id", row.id);
+      if (error) {
+        console.warn("backfill update failed:", row.id, error.message);
+        return false;
+      }
+      return true;
+    }),
+  );
+
+  return {
+    checked: rows.length,
+    updated: results.filter(Boolean).length,
+  };
 }
