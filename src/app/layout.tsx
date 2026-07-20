@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Lora, Noto_Sans_JP } from "next/font/google";
 import { DesignTokens, Toaster } from "@takaki/go-design-system";
 import { Analytics } from "@vercel/analytics/react";
-import { DarkModeInit } from "@/components/dark-mode-init";
 import { PwaRegister } from "@/components/pwa-register";
 import "./globals.css";
 
@@ -83,7 +82,6 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <DarkModeInit />
         <DesignTokens
           primaryColor="oklch(56% 0.15 35)"
           primaryColorHover="oklch(49% 0.14 35)"

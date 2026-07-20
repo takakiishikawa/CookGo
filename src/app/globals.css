@@ -2,9 +2,6 @@
 @source "../../node_modules/@takaki/go-design-system/dist";
 @import "@takaki/go-design-system/theme.css";
 
-/* class-based dark mode: responds to .dark on <html> */
-@variant dark (&:where(.dark, .dark *));
-
 /* HomeCook primary color — warm terracotta evoking home cooking */
 :root {
   --color-primary: oklch(56% 0.15 35);
