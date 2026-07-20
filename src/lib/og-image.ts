@@ -7,7 +7,7 @@ export async function fetchOgImage(url: string): Promise<string | null> {
     const res = await fetch(url, {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; CookGoBot/1.0; +https://cook-go.vercel.app)",
+          "Mozilla/5.0 (compatible; HomeCookBot/1.0; +https://home-cook-lovat.vercel.app)",
         Accept: "text/html,application/xhtml+xml",
       },
       signal: AbortSignal.timeout(4000),
